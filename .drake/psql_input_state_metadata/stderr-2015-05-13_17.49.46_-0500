@@ -1,1 +1,0 @@
-psql:/Users/jtwalsh/git-projects/policy_diffusion/input/state_metadata.sql:2: NOTICE:  table "state_metadata" does not exist, skipping
