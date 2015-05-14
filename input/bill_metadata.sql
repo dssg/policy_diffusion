@@ -2,16 +2,14 @@
 DROP TABLE IF EXISTS input.bill_metadata;
 
 CREATE TABLE input.bill_metadata (
-	bill_id VARCHAR(10),
-	chamber VARCHAR(10),
+	bill_id VARCHAR,
+	chamber VARCHAR,
 	created_at TIMESTAMP,
-	id VARCHAR(20),
-	session VARCHAR(8),
+	id VARCHAR,
+	session VARCHAR,
 	state VARCHAR(2),
 	subjects VARCHAR,
 	title VARCHAR,
-	type VARCHAR(10),
+	type VARCHAR,
 	updated_at TIMESTAMP
 );
-
-\COPY input.bill_metadata FROM 'data/input/bill_metadata.csv' WITH CSV HEADER;

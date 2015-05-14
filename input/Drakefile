@@ -1,16 +1,18 @@
 
 ; GRAB STATE LEGISLATIVE METADATA FROM SUNLIGHT
-data/input/state_metadata.csv <- [-timestamp]
-	input/./state_metadata.py | sed -E "s/u?'//g" > $OUTPUT
+;data/input/state_metadata.csv <- [-timestamp]
+;	input/./state_metadata.py | sed -E "s/u?'//g" > $OUTPUT
 
 ; CREATE TABLE FOR STATE METADATA
 psql/input/state_metadata <- input/state_metadata.sql, data/input/state_metadata.csv [method:psql]
 
 
-; GRAB STATE LEGISLATIVE METADATA FROM SUNLIGHT
-;data/input/bill_metadata.csv <- [-timestamp]
-;	input/./bill_metadata.py > $OUTPUT
 
 ; CREATE TABLE FOR BILL METADATA
-;psql/input/bill_metadata <- input/bill_metadata.sql, data/input/bill_metadata.csv; [method:psql]
+; (sql file creates the table; the python script pushes the data)
+psql/input/bill_metadata <- input/bill_metadata.sql [method:psql]
+
+; GRAB STATE LEGISLATIVE METADATA FROM SUNLIGHT
+data/input/bill_metadata.csv <- [-timestamp]
+	input/./bill_metadata.py > $OUTPUT
 
