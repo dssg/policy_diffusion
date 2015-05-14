@@ -1,0 +1,13 @@
+
+; GRAB STATE LEGISLATIVE METADATA FROM SUNLIGHT
+data/input/state_metadata.csv <- [-timestamp]
+	input/./state_metadata.py > $OUTPUT
+
+
+; CREATE TABLE FOR STATE METADATA
+psql/input/state_metadata <- input/state_metadata.sql, data/input/state_metadata.csv [method:psql]
+
+
+; CREATE TABLE FOR BILL METADATA
+psql/input/bill_metadata <- input/bill_metadata.sql [method:psql]
+

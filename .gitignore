@@ -1,3 +1,9 @@
+# Data
+data/
+
+# Database info
+default_profile
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -52,3 +58,7 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Drake 
+drake.*
+
