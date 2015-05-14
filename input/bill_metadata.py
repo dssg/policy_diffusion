@@ -35,7 +35,7 @@ def parse_bill_metadata(bill_metadata):
     _id = bill_metadata['id']
     session = bill_metadata['session']
     state = bill_metadata['state']
-    if 'subjects' in bill_metadata:
+    if len(bill_metadata['subjects']) > 0:
         subjects_temp = str(bill_metadata['subjects']).strip('[]')
         subjects = re.sub("u'", "'", subjects_temp)
     else:
