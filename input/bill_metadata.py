@@ -22,8 +22,12 @@ conn = psycopg2.connect(host = db_info[0], database = db_info[1], user = db_info
 cur = conn.cursor()
 
 
+# GRAB STATES TRACKED BY SUNLIGHT
+cur.execute
+
+
 # GRAB STATE METADATA FROM SUNLIGHT
-state_metadata = openstates.all_metadata()
+bill_metadata = openstates.bills()
 
 
 # PARSE SUNLIGHT DATA AND WRITE TO STDOUT 
@@ -38,6 +42,5 @@ for state in state_metadata:
         lower_chamber_title = None
     upper_chamber_name = state['chambers']['upper']['name']
     upper_chamber_title = state['chambers']['upper']['title']
-    feature_flags = str(state['feature_flags']).strip('[]').replace(',', ';')
-    name = state['name']
-    a.writerow((abbreviation, lower_chamber_name, lower_chamber_title, upper_chamber_name, upper_chamber_title, feature_flags, name))
+    feature_flags = str(state['feature_flags']).strip('[]')
+    a.writerow((abbreviation, lower_chamber_name, lower_chamber_title, upper_chamber_name, upper_chamber_title, feature_flags))

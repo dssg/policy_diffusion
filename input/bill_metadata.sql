@@ -13,3 +13,5 @@ CREATE TABLE input.bill_metadata (
 	type VARCHAR(10),
 	updated_at TIMESTAMP
 );
+
+\COPY input.bill_metadata FROM 'data/input/bill_metadata.csv' WITH CSV HEADER;

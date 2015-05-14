@@ -7,6 +7,8 @@ CREATE TABLE input.state_metadata (
 	lower_chamber_title VARCHAR(15),
 	upper_chamber_name VARCHAR(10),
 	upper_chamber_title VARCHAR(15),
-	feature_flags VARCHAR(30),
-	name VARCHAR(15)
+	feature_flags VARCHAR(50),
+	name VARCHAR(20)
 );
+
+\COPY input.state_metadata FROM 'data/input/state_metadata.csv' WITH CSV;
