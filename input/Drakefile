@@ -3,7 +3,7 @@
 ;data/input/state_metadata.csv <- [-timestamp]
 ;	input/./state_metadata.py | sed -E "s/u?'//g" > $OUTPUT
 
-; CREATE TABLE FOR STATE METADATA
+; CREATE TABLE / COPY FOR STATE METADATA
 psql/input/touch_state_metadata <- input/state_metadata.sql, data/input/state_metadata.csv [method:psql]
 
 
@@ -12,7 +12,7 @@ psql/input/touch_state_metadata <- input/state_metadata.sql, data/input/state_me
 ; (sql file creates the table; the python script pushes the data)
 psql/input/touch_bill_metadata <- input/bill_metadata.sql [method:psql]
 
-; GRAB STATE LEGISLATIVE METADATA FROM SUNLIGHT
-data/input/touch_bill_metadata <- [-timestamp]
-	input/./bill_metadata.py && touch $OUTPUT
+; GRAB BILL METADATA FROM SUNLIGHT
+data/input/touch_bill_metadata <- input/download_bulk_sunlight_files.sh
+	 bash $INPUT && touch $OUTPUT
 

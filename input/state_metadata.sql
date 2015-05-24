@@ -12,3 +12,5 @@ CREATE TABLE input.state_metadata (
 );
 
 \COPY input.state_metadata FROM 'data/input/state_metadata.csv' WITH CSV;
+
+ALTER TABLE input.state_metadata ADD COLUMN bills_identified BOOLEAN;

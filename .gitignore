@@ -4,6 +4,9 @@ data/
 # Database info
 default_profile
 
+# Sunlight key
+.sunlight.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
