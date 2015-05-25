@@ -10,6 +10,9 @@ default_profile
 # Sunlight key
 .sunlight.*
 
+# IPython Notebook checkpoints
+.ipynb_checkpoints/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
