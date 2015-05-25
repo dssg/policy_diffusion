@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
+eval $(cat ../default_profile | sed 's/^/export /')
 
-state_abbrevs=$(psql -c "\COPY (SELECT abbreviation FROM input.state_metadata WHERE bills_identified IS NULL ORDER BY abbreviation LIMIT 1) TO STDOUT;")
+state_abbrevs=$(psql -t -c "SELECT abbreviation FROM input.state_metadata WHERE bills_identified IS NULL ORDER BY abbreviation;")
 
-for element in $state_abbrevs; do
-	wget -O /mnt/data/sunlight/openstates_zipped_files/$element http://static.openstates.org/downloads/2015-05-01-$element-json.zip
+for i in $state_abbrevs; do
+	wget -O /mnt/data/sunlight/openstates_zipped_files/${i} http://static.openstates.org/downloads/2015-05-01-${i}-json.zip
 done
-
-#echo $state_abbrevs
 
 
 # GRAB STATES TRACKED BY SUNLIGHT
