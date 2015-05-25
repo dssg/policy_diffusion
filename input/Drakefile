@@ -4,15 +4,17 @@
 ;	input/./state_metadata.py | sed -E "s/u?'//g" > $OUTPUT
 
 ; CREATE TABLE / COPY FOR STATE METADATA
-psql/input/touch_state_metadata <- input/state_metadata.sql, data/input/state_metadata.csv [method:psql]
+;psql/input/touch_state_metadata <- input/state_metadata.sql, data/input/state_metadata.csv [method:psql]
 
 
 
 ; CREATE TABLE FOR BILL METADATA
 ; (sql file creates the table; the python script pushes the data)
-psql/input/touch_bill_metadata <- input/bill_metadata.sql [method:psql]
+;psql/input/touch_bill_metadata <- input/bill_metadata.sql [method:psql]
 
 ; GRAB BILL METADATA FROM SUNLIGHT
-data/input/touch_bill_metadata <- input/download_bulk_sunlight_files.sh
-	 bash $INPUT && touch $OUTPUT
+;data/input/touch_bill_metadata <- input/download_bulk_sunlight_files.sh
+;	 bash $INPUT && touch $OUTPUT
 
+touch_temp <- 
+	echo "hello world"
