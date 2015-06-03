@@ -46,6 +46,7 @@ def urlToText(path):
 
 ################################
 #doc functions
+#Good resource: http://www.konstantinkashin.com/blog/2013/09/25/scraping-pdfs-and-word-documents-with-python/
 
 def docToText(path):
 	"""
@@ -67,6 +68,27 @@ def docToText(path):
 		output = output + paragraph.text
 
 	return output
+
+def oldDocToTest(path):
+	"""
+	Turns doc file into a string.
+
+	Args:
+		path to doc file
+
+	Returns:
+		a string of the doc file
+	"""
+	name = path[:-4]
+	textFile = name + ".txt"
+	os.system("antiword " + path + " > " + textFile)
+
+	with codecs.open(textFile, encoding='utf-8') as text:
+		output = text.read()
+	os.system("rm " + textFile)
+
+	return output
+
 
 
 
