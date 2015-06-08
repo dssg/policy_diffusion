@@ -2,9 +2,44 @@
 
 from PyPDF2 import PdfFileReader
 from bs4 import BeautifulSoup
+import urllib2
 from docx import Document #python-docx pacakage
 import os
 import codecs
+
+################################
+#global variables
+
+path = "./DataExtractorTests/"
+
+################################
+#helper functions
+
+def soupToText(soup):
+	"""
+	Args:
+		BeautifulSoup soup object of an html file
+
+	Returns:
+		a string of the text stripped of the javascript
+	"""
+
+	# kill all script and style elements
+	for script in soup(["script", "style"]):
+	    script.extract()    # rip it out
+
+	# get text
+	text = soup.get_text()
+
+	# break into lines and remove leading and trailing space on each
+	lines = (line.strip() for line in text.splitlines())
+	# break multi-headlines into a line each
+	chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+	# drop blank lines
+	text = '\n'.join(chunk for chunk in chunks if chunk)
+
+	return text
+
 
 ################################
 #pdf functions
@@ -26,10 +61,11 @@ def pdfToText(path):
 
 	return output
 
+
 ################################
 #html functions
 
-def urlToText(path):
+def htmlToText(path):
 	"""
 	Args:
 		path to html file
@@ -39,10 +75,21 @@ def urlToText(path):
 	"""
 	with codecs.open(path, encoding='utf-8') as html:
 		soup = BeautifulSoup(html)
-	output = soup.get_text()
 
-	return output
+	return soupToText(soup)
 
+def urlToText(url):
+	"""
+	Args:
+		url 
+
+	Returns:
+		a string of the text on the url
+	"""
+	doc = urllib2.urlopen(url).read()
+	soup = BeautifulSoup(doc)
+
+	return soupToText(soup)
 
 ################################
 #doc functions
@@ -91,4 +138,18 @@ def oldDocToTest(path):
 
 
 
+
+if __name__ == "__main__":
+	#Run tests
+	print "pdf test: "
+	print pdfToText(path + "test.pdf")
+
+	print "urltest: "
+	print urlToText('http://www.alec.org/model-legislation/72-hour-budget-review-act/')
+
+	print "html test: "
+	print htmlToText(path + "test.html")
+
+	print "old doc test: "
+	print oldDocToTest(path + 'test.doc')
 
