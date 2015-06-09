@@ -71,3 +71,9 @@ target/
 # Drake 
 drake.*
 .drake/
+
+#pycharm
+*.idea
+
+
+
