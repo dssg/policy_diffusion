@@ -53,38 +53,59 @@ with open('alice_bills.json', 'w') as f:
 
 print str(badCount) + " did not work"
 
-#store text from links in dictionary to save
-# aliceText = {}
-# for link in aliceLinks:
-# 	aliceText[link] = DataExtractor.urlToText(doc)
 
-
-# outFile = open("{0}/{1}".format(outDirRootPath,outFilePath),'w')
-# outFile.write(ujson.encode(billJson))
 
 #########Alice
 
-#mechanize attempt
-import mechanize
+#Already made files with links in them; now need to extract them
+path = "/Users/jkatzsamuels/Desktop/dssg/sunlight/test_code/csg_files/links_"
 
-br = mechanize.Browser()
-# br.set_all_readonly(False)    # allow everything to be written to
-# br.set_handle_robots(False)   # ignore robots
-# br.set_handle_refresh(False)  # can sometimes hang without this
-# # br.addheaders =   	      	# [('User-agent', 'Firefox')]
+lines = []
+for i in [1,2,3]:
+	filePath = path + str(i) + ".txt"
+	with open(filePath) as f:
+		lines.extend(f.read().splitlines())
 
-aliceUrl = 'https://stateinnovation.org/search/?q=matchall&q.parser=structured&partial=false&return=title%2Csummary%2Cyear%2Csource%2Ctags&size=10&sort=_score%20desc&start=0&fq=(and%20(or%20type_of%3A%20%27Model%20Law%27))&highlight.title=%7B%22pre_tag%22%3A%22%3Cstrong%3E%22%2C%22post_tag%22%3A%22%3C%2Fstrong%3E%22%7D&highlight.summary=%7B%22pre_tag%22%3A%22%3Cstrong%3E%22%2C%22post_tag%22%3A%22%3C%2Fstrong%3E%22%7D'
-#aliceUrl = 'https://stateinnovation.org/search/'
+text = ''.join(lines)
+bs = BeautifulSoup(text)
 
-# response = br.open(aliceUrl)
+links = []
+for link in bs.find_all('a'):
+	if link.has_attr('href'):
+		links.append(link.attrs['href'])
 
 
-#url attempt
-from bs4 import BeautifulSoup
-import requests
+#grab pdfs from links
+billList = []
+for url in links:
+	doc = urllib2.urlopen(url).read()
+	bs = BeautifulSoup(doc)
 
-doc = requests.get(aliceUrl).text
-bs = BeautifulSoup(doc, 'html5')
-bs
+	for link in bs.find_all('a'):
+		if link.has_attr('href'):
+			candidate = link.attrs['href']
+			if candidate[-4:] == ".pdf": #links with pdf extension tend to be model bills
+				billList.append("https://stateinnovation.org" + candidate) 
 
-for link in bs.find_all(''): print link
+
+badCount = 0
+goodCount = 0
+with open('csg_bills.json', 'w') as f:
+	for link in billList:
+	    # url_key = {}
+	    # source = urllib2.urlopen(link).read()
+	    # Jsonbill = bill_source_to_json(link, source, None)
+	    # f.write("{0}\n".format(Jsonbill))		
+		try:
+		    source = urllib2.urlopen(link).read()
+		    Jsonbill = bill_source_to_json(link, source, None)
+		    f.write("{0}\n".format(Jsonbill))
+		    goodCount += 1
+		    print goodCount
+		except:
+			badCount += 1
+
+print str(badCount) + " did not work"
+
+
+
