@@ -4,6 +4,7 @@ import bs4
 import ujson
 from utils import bill_source_to_json
 from os import listdir
+from DataExtractor import pdfToText
 
 url ='http://www.alec.org/model-legislation/'
 response = urllib2.urlopen(url).read()
@@ -29,7 +30,6 @@ ALEClinks = set(ALEClinks)
 #Save to json file
 with open('alec_bills.json', 'w') as f:
     for line in ALEClinks:
-        url_key = {}
         source = urllib2.urlopen(line).read()
         url = line
         date = 2015
@@ -38,7 +38,12 @@ with open('alec_bills.json', 'w') as f:
 
 
 ##Old ALEC urls
-
+path = '../../PolicyDiffusion/ALEC_exposed'
+pdf_source = pdfToText('../../PolicyDiffusion/ALEC_exposed/Paycheck Protection Act Exposed.pdf')
+names = ('../../PolicyDiffusion/ALEC_exposed/7J4-Concealed_Carry_True_Reciprocity_Act Exposed.pdf')
+for name in listdir(path):
+    pdf_source = pdfToText(name)
+    print(pdf_source)
 
 
 
