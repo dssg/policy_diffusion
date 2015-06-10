@@ -1,7 +1,7 @@
 
 DROP TABLE IF EXISTS input.bill_metadata;
 
-CREATE TABLE input.bill_metadata (
+CREATE TABLE bill_metadata (
 	bill_id VARCHAR,
 	chamber VARCHAR,
 	created_at TIMESTAMP,
