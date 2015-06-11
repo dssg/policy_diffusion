@@ -13,39 +13,38 @@ from pprint import pprint
 STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legistlation"
 
+ES_CONNECTION = Elasticsearch()
 
-# creates index for bills and model legislation stored in
-# data_path, overwriting index if it is already created
-def create_index(data_path):
-
-    #get file location of all json files
-    #bill_data_path = os.path.join(data_path, "scraped_bills")
-    bill_data_path = os.path.join(data_path, "scraped_bills/ca")
+# bulk loads all json files in subdirectory
+def load_bulk_bills(bill_directory):
     bill_files = []
-    for dirname, dirnames, filenames in os.walk(bill_data_path):
+    for dirname, dirnames, filenames in os.walk(bill_directory):
         for filename in filenames:
-            bill_files.append( os.path.join(dirname, filename) )
+            bill_files.append(os.path.join(dirname, filename))
 
     bulk_data = []
-    for i,bill_file in enumerate(bill_files[8500:]):
-        print i
+    for i, bill_file in enumerate(bill_files):
 
         data_dict = ujson.decode(open(bill_file).read())
         bill_dict = {}
 
-        print "______________________________________________________________________"
-        pprint( data_dict.keys())
-        print bill_file
-        print "______________________________________________________________________"
+        #print "______________________________________________________________________"
+        #pprint(data_dict.keys())
+        #print bill_file
+        #print "______________________________________________________________________"
 
         bill_text_count = [1 for x in data_dict['type'] if "bill" in x.lower()]
         if sum(bill_text_count) < 1:
             continue
 
-        bill_id = re.sub("\s+","",data_dict['bill_id'])
+        bill_id = re.sub("\s+", "", data_dict['bill_id'])
 
-        bill_document_first = base64.b64decode(data_dict['versions'][0]['bill_document'])
-        bill_document_last = base64.b64decode(data_dict['versions'][-1]['bill_document'])
+        if data_dict['versions'] == []:
+            bill_document_first = ""
+            bill_document_last = ""
+        else:
+            bill_document_first = base64.b64decode(data_dict['versions'][0]['bill_document'])
+            bill_document_last = base64.b64decode(data_dict['versions'][-1]['bill_document'])
 
         if len(bill_document_first) == 0:
             bill_document_first = None
@@ -57,9 +56,7 @@ def create_index(data_path):
         else:
             bill_document_last = parser.from_buffer(bill_document_last)['content']
 
-
-
-        bill_dict['unique_id'] = "{0}_{1}_{2}".format(data_dict['state'],data_dict['session'],bill_id)
+        bill_dict['unique_id'] = "{0}_{1}_{2}".format(data_dict['state'], data_dict['session'], bill_id)
         bill_dict['bill_id'] = data_dict['bill_id']
         bill_dict['date_updated'] = data_dict['updated_at']
         bill_dict['session'] = data_dict['session']
@@ -85,28 +82,45 @@ def create_index(data_path):
         else:
             bill_dict['summary'] = None
 
-
         op_dict = {
             "index": {
-        	"_index": STATE_BILL_INDEX,
-        	"_type": "bill_document",
-        	"_id": bill_dict["unique_id"]
-                }
+                "_index": STATE_BILL_INDEX,
+                "_type": "bill_document",
+                "_id": bill_dict["unique_id"]
+            }
         }
 
         bulk_data.append(op_dict)
         bulk_data.append(bill_dict)
 
+        if (i%1000) == 0:
+            ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data)
+            print "added bulk documents ",i
+            bulk_data = []
 
-    es = Elasticsearch()
 
-    if es.indices.exists(STATE_BILL_INDEX):
+    ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data)
+    return
+
+
+# creates index for bills and model legislation stored in
+# data_path, overwriting index if it is already created
+def create_index(data_path):
+    bill_data_path = os.path.join(data_path, "scraped_bills")
+    state_directories = [os.path.join(bill_data_path, x) for x in os.listdir(bill_data_path)]
+
+    if ES_CONNECTION.indices.exists(STATE_BILL_INDEX):
         print("deleting '%s' index..." % (STATE_BILL_INDEX))
-        res = es.indices.delete(index = STATE_BILL_INDEX)
-        print(" response: '%s'" % (res))
+        res = ES_CONNECTION.indices.delete(index=STATE_BILL_INDEX)
 
-    res = es.bulk(index = STATE_BILL_INDEX, body = bulk_data, refresh = True)
+    request_body = {"settings": {"number_of_shards": 1, "number_of_replicas": 0}}
 
+    print("creating '%s' index..." % (STATE_BILL_INDEX))
+    res = ES_CONNECTION.indices.create(index=STATE_BILL_INDEX, body=
+    {"settings": {"number_of_shards": 1, "number_of_replicas": 0}})
+
+    for state_dir in state_directories:
+        load_bulk_bills(state_dir)
 
 
 ## main functiont that manages unix interface
