@@ -37,13 +37,13 @@ with open('alec_bills.json', 'w') as f:
         f.write("{0}\n".format(Jsonbill))
 
 
-##Old ALEC urls
-path = '../../PolicyDiffusion/ALEC_exposed'
-pdf_source = pdfToText('../../PolicyDiffusion/ALEC_exposed/Paycheck Protection Act Exposed.pdf')
-names = ('../../PolicyDiffusion/ALEC_exposed/7J4-Concealed_Carry_True_Reciprocity_Act Exposed.pdf')
-for name in listdir(path):
-    pdf_source = pdfToText(name)
-    print(pdf_source)
+#Save old alec bills (from Center for the Media and Democracy)
+names = listdir('/Users/eugeniagiraudy/Dropbox/DSSG/PolicyDiffusion/alec_exposed')
 
-
-
+with open('alec_old_bills.json', 'w') as f2:
+    for name in names:
+        source2 = open(name, 'rb').read()
+        url2 = None
+        date2 = 2010-2013
+        Jsonbill2 = bill_source_to_json(url2, source2, date2)
+        f2.write("{0}\n".format(Jsonbill2))
