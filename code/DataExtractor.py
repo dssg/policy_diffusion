@@ -6,6 +6,8 @@ import urllib2
 from docx import Document #python-docx pacakage
 import os
 import codecs
+from pyPdf import PdfFileWriter, PdfFileReader
+from StringIO import StringIO
 
 ################################
 #global variables
@@ -78,10 +80,11 @@ def htmlToText(path):
 
 	return soupToText(soup)
 
-def urlToText(url):
+
+def urlHTMLToText(url):
 	"""
 	Args:
-		url 
+		url that corresponds to html
 
 	Returns:
 		a string of the text on the url
@@ -90,6 +93,25 @@ def urlToText(url):
 	soup = BeautifulSoup(doc)
 
 	return soupToText(soup)
+
+
+def urlPDFToText(url):
+	"""
+	Args:
+		url that corresponds to pdf
+
+	Returns:
+		a string of the text on the url
+	"""
+	doc = urllib2.urlopen(url).read()
+	memoryFile = StringIO(doc)
+	pdfFile = PdfFileReader(memoryFile)
+
+	output = ""
+	for page in PDF.pages:
+	     output = output + page.extractText()
+
+	return output
 
 ################################
 #doc functions
