@@ -33,12 +33,12 @@ def parse_committee_metadata(committee_metadata):
         members = Json(committee_metadata['members'][0])
     else: 
         members = None
-    sources = Json(committee_metadata['sources'][0])
+    sources = committee_metadata['sources'][0]['url']
     parent_id = committee_metadata['parent_id']
     created_at = committee_metadata['created_at']
     updated_at = committee_metadata['updated_at']
     if len(committee_metadata['all_ids']) > 0:
-        all_ids = Json(committee_metadata['all_ids'][0])
+        all_ids = committee_metadata['all_ids'][0]
     else:
         all_ids = None
     if 'level' in committee_metadata:
