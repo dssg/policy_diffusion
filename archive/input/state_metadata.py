@@ -22,7 +22,7 @@ conn = psycopg2.connect(host = db_info[0], database = db_info[1], user = db_info
 cur = conn.cursor()
 
 
-# PARSE STATE METADATA
+# FUNCTION TO PARSE STATE METADATA
 def parse_state_metadata(state_metadata):
     name = state_metadata['name']
     abbreviation = state_metadata['abbreviation']
@@ -39,7 +39,7 @@ def parse_state_metadata(state_metadata):
         upper_chamber_name, upper_chamber_name, feature_flags))
 
 
-# GRAB STATE METADATA FROM SUNLIGHT
+# GRAB THE DATA FROM SUNLIGHT API
 state_metadata = openstates.all_metadata()
 
 
@@ -48,8 +48,6 @@ temp_state_metadata = []
 for state in state_metadata:
     temp_state_metadata.append(parse_state_metadata(state))
 
-
 args_str = ','.join(cur.mogrify("(%s,%s,%s,%s,%s,%s,%s)", x) for x in temp_state_metadata)
 cur.execute("INSERT INTO state_metadata VALUES " + args_str) 
 conn.commit()
-
