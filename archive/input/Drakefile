@@ -1,6 +1,14 @@
+PROFILE:=default_profile
+%include $[PROFILE]
+
+psql()
+	psql -v ON_ERROR_STOP=1 -f $[INPUT] && touch $[OUTPUT]
+
+
+
 
 ; GRAB STATE LEGISLATIVE METADATA FROM SUNLIGHT
-;data/input/state_metadata.csv <- [-timestamp]
+/mnt/data/sunlight/data/input/state_metadata.csv <- [-timestamp]
 ;	input/./state_metadata.py | sed -E "s/u?'//g" > $OUTPUT
 
 ; CREATE TABLE / COPY FOR STATE METADATA
@@ -16,6 +24,4 @@
 ;data/input/touch_bill_metadata <- input/download_bulk_sunlight_files.sh
 ;	 bash $INPUT && touch $OUTPUT
 
-touch_temp <- 
-	echo "hello world"
 
