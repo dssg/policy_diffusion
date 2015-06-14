@@ -62,6 +62,6 @@ for path, subdirs, files in os.walk(r'/mnt/data/sunlight/openstates_unzipped/com
             temp_committee_metadata.append(parsed_data)
 
 args_str = ','.join(cur.mogrify("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", x) for x in temp_committee_metadata)
-cur.execute("INSERT INTO committee_metadata VALUES " + args_str) 
+cur.execute("INSERT INTO committees VALUES " + args_str) 
 conn.commit()
 
