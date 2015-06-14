@@ -42,7 +42,10 @@ def parse_bill_metadata(bill_metadata):
     else:
         subjects = None
     if 'scraped_subjects' in bill_metadata:
-        scraped_subjects = bill_metadata['scraped_subjects'][0]
+        if len(bill_metadata['scraped_subjects']) > 0:
+            scraped_subjects = bill_metadata['scraped_subjects'][0]
+        else:
+            scraped_subjects = None
     else:
         scraped_subjects = None
     type_ = bill_metadata['type'][0]
@@ -95,7 +98,7 @@ for path, subdirs, files in os.walk(r'/mnt/data/sunlight/openstates_unzipped/bil
             parsed_data = parse_bill_metadata(bill)
             temp_bill_metadata.append(parsed_data)
         if len(temp_bill_metadata) == 10000 or name == files[len(files)-1]:
-                args_str = ','.join(cur.mogrify("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", x) for x in temp_bill_metadata[:1])
+                args_str = ','.join(cur.mogrify("(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", x) for x in temp_bill_metadata)
                 cur.execute("INSERT INTO bill_metadata VALUES " + args_str) 
                 conn.commit()
                 temp_bill_metadata = []
