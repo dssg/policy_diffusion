@@ -7,6 +7,10 @@ import re
 import string
 import urllib2
 from tika import parser
+from collections import defaultdict
+
+
+#TODO: make the below code into functions that work well with elastic search interface
 
 
 ##obtain test data
@@ -145,6 +149,30 @@ for i in range(len(test_list)):
 
 final_text = string.join(keep, '\n')
 
-    
+
+##separate text into sections
+#return as dictionary with section as key
+#NOTE: that it forgets everything before first section
+def isNewSection(s):
+    '''
+    Determines whether s is a new section.
+    '''
+    if re.match(r'^Section \d', s) != None:
+        return True
+    else:
+        return False
+
+sections = defaultdict(list)
+seen_section = 0 #have we seen a section yet
+for line in keep:
+    if isNewSection(line):
+        seen_section = 1
+        section = line
+        sections[section].append(line)
+    elif seen_section == 0:
+        continue
+    else:
+        sections[section].append(line)
+
 
 
