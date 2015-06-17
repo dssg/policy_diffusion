@@ -3,9 +3,9 @@
 
 from sunlight import openstates
 import psycopg2
-import re
 import csv
 import sys
+import re
 
 
 
@@ -22,22 +22,32 @@ conn = psycopg2.connect(host = db_info[0], database = db_info[1], user = db_info
 cur = conn.cursor()
 
 
-# GRAB STATE METADATA FROM SUNLIGHT
-state_metadata = openstates.all_metadata()
-
-
-# PARSE SUNLIGHT DATA AND WRITE TO STDOUT 
-a = csv.writer(sys.stdout)
-for state in state_metadata:
-    abbreviation = state['abbreviation']
-    if 'lower' in state['chambers']:
-        lower_chamber_name = state['chambers']['lower']['name']
-        lower_chamber_title = state['chambers']['lower']['title']
+# FUNCTION TO PARSE STATE METADATA
+def parse_state_metadata(state_metadata):
+    name = state_metadata['name']
+    abbreviation = state_metadata['abbreviation']
+    if 'lower' in state_metadata['chambers']:
+        lower_chamber_name = state_metadata['chambers']['lower']['name']
+        lower_chamber_title = state_metadata['chambers']['lower']['title']
     else:
         lower_chamber_name = None
         lower_chamber_title = None
-    upper_chamber_name = state['chambers']['upper']['name']
-    upper_chamber_title = state['chambers']['upper']['title']
-    feature_flags = str(state['feature_flags']).strip('[]').replace(',', ';')
-    name = state['name']
-    a.writerow((abbreviation, lower_chamber_name, lower_chamber_title, upper_chamber_name, upper_chamber_title, feature_flags, name))
+    upper_chamber_name = state_metadata['chambers']['upper']['name']
+    upper_chamber_title = state_metadata['chambers']['upper']['title']
+    feature_flags = ', '.join(state_metadata['feature_flags'])
+    return((name, abbreviation, lower_chamber_name, lower_chamber_title,
+        upper_chamber_name, upper_chamber_name, feature_flags))
+
+
+# GRAB THE DATA FROM SUNLIGHT API
+state_metadata = openstates.all_metadata()
+
+
+# PARSE SUNLIGHT DATA AND WRITE TO POSTGRES
+temp_state_metadata = []
+for state in state_metadata:
+    temp_state_metadata.append(parse_state_metadata(state))
+
+args_str = ','.join(cur.mogrify("(%s,%s,%s,%s,%s,%s,%s)", x) for x in temp_state_metadata)
+cur.execute("INSERT INTO state_metadata VALUES " + args_str) 
+conn.commit()

@@ -2,16 +2,24 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from utils import bill_source_to_json
+import urllib2
 
 # Access list of clean urls
-f = open('/Users/Emily/desktop/sunlight/policy_diffusion/data/model_legislation_urls/clean_urls.txt','r')
+with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/model_legislation_urls/clean_urls.txt','r') as f:
+	links = f.read().splitlines()
 
-# Iterate over list of urls and connect to json file
-with open('model-urls.json', 'w') as jsonfile:
-    for url in f:
-        source = requests.get(url)
-        link = url
-        # Try to grab the date from each
-        date = None
-        Jsonbill = bill_source_to_json(link, source, date)
-        jsonfile.write("{0}\n".format(Jsonbill))
+badCount = 0
+goodCount = 0
+with open('misc_bills.json', 'w') as jsonfile:
+	for link in links:
+		try:
+		    source = urllib2.urlopen(link).read()
+		    Jsonbill = bill_source_to_json(link, source, None)
+		    jsonfile.write("{0}\n".format(Jsonbill))
+		    goodCount += 1
+		    print goodCount
+		except:
+			badCount += 1
+
+print str(badCount) + " did not work"
+print str(goodCount) + " worked"
