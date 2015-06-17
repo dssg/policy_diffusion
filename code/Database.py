@@ -8,7 +8,12 @@ import ujson
 import re
 from tika import parser
 import base64
+import logging
+
 from pprint import pprint
+
+#DATABASE_LOG = os.environ['POLICY_DIFFUSION'] + '/logs/database.log'
+#logging.basicConfig(filename = DATABASE_LOG, level=logging.DEBUG)
 
 STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legistlation"
@@ -28,33 +33,27 @@ def load_bulk_bills(bill_directory):
         data_dict = ujson.decode(open(bill_file).read())
         bill_dict = {}
 
-        #print "______________________________________________________________________"
-        #pprint(data_dict.keys())
-        #print bill_file
-        #print "______________________________________________________________________"
-
         bill_text_count = [1 for x in data_dict['type'] if "bill" in x.lower()]
         if sum(bill_text_count) < 1:
             continue
 
         bill_id = re.sub("\s+", "", data_dict['bill_id'])
 
-        if data_dict['versions'] == []:
-            bill_document_first = ""
-            bill_document_last = ""
-        else:
-            bill_document_first = base64.b64decode(data_dict['versions'][0]['bill_document'])
-            bill_document_last = base64.b64decode(data_dict['versions'][-1]['bill_document'])
+        try:
+            if data_dict['versions'] == []:
+                bill_document_first = ""
+                bill_document_last = ""
+            else:
+                bill_document_first = base64.b64decode(data_dict['versions'][0]['bill_document'])
+                bill_document_first = parser.from_buffer(bill_document_first)['content']
+                bill_document_last = base64.b64decode(data_dict['versions'][-1]['bill_document'])
+                bill_document_last = parser.from_buffer(bill_document_last)['content']
 
-        if len(bill_document_first) == 0:
+        except Exception as e:
+            print e.args
             bill_document_first = None
-        else:
-            bill_document_first = parser.from_buffer(bill_document_first)['content']
-
-        if len(bill_document_last) == 0:
             bill_document_last = None
-        else:
-            bill_document_last = parser.from_buffer(bill_document_last)['content']
+
 
         bill_dict['unique_id'] = "{0}_{1}_{2}".format(data_dict['state'], data_dict['session'], bill_id)
         bill_dict['bill_id'] = data_dict['bill_id']
@@ -68,6 +67,8 @@ def load_bulk_bills(bill_directory):
         bill_dict['date_created'] = data_dict['created_at']
         bill_dict['bill_document_first'] = bill_document_first
         bill_dict['bill_document_last'] = bill_document_last
+        bill_dict['actions'] = data_dict['actions']
+
 
         if "short_tite" in data_dict.keys():
             bill_dict['short_title'] = data_dict['short_title']
@@ -93,13 +94,13 @@ def load_bulk_bills(bill_directory):
         bulk_data.append(op_dict)
         bulk_data.append(bill_dict)
 
-        if (i%1000) == 0:
-            ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data)
-            print "added bulk documents ",i
+
+        if (i%100) == 0:
+            ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout = 100)
             bulk_data = []
 
 
-    ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data)
+    ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout=100)
     return
 
 
@@ -120,6 +121,7 @@ def create_index(data_path):
     {"settings": {"number_of_shards": 1, "number_of_replicas": 0}})
 
     for state_dir in state_directories:
+        print ("Loading in {0}".format(state_dir))
         load_bulk_bills(state_dir)
 
 
