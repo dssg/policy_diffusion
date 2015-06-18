@@ -129,12 +129,12 @@ path = '/mnt/data/sunlight/dssg/scraped_bills/tx/81/lower/HR_2889.json'
 check_extractor(path, tx_extract_text, 'tx')
 
 #ut
-def ut_extract_text(doc, data):
-    if doc == 'application/pdf':
-        return text_after_line_numbers(pdfdata_to_text(data))
+def ut_extract_text(doc_source):
+    doc = lxml.html.fromstring(doc_source)
+    return doc.xpath('//html')[0].text_content()
 
 path = '/mnt/data/sunlight/dssg/scraped_bills/ut/2011/lower/HJR_5.json'
-check_extractor_doctypes(path, ut_extract_text, 'ut')
+check_extractor(path, ut_extract_text, 'ut')
 
 #vt
 def vt_extract_text(doc_source):
