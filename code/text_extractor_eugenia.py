@@ -80,9 +80,11 @@ test_mo = extract_text_mo(doc_source_mo)
 #Montana (MT)
 
 def extract_text_mt(doc_source):
-    return text_after_line_numbers(pdfdata_to_text(doc_source))
-
-url_mt = http://static.openstates.org/documents/mt/MTD00005634
+    doc = lxml.html.fromstring(doc_source)
+    text = doc.xpath('//body')[0].text_content()
+    return text
+    
+url_mt = 'http://static.openstates.org/documents/mt/MTD00005634'
 doc_source_mt = urllib2.urlopen(url_mt).read()
 test_mt = extract_text_mt(doc_source_mt)
 
