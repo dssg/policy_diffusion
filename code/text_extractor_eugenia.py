@@ -80,9 +80,11 @@ test_mo = extract_text_mo(doc_source_mo)
 #Montana (MT)
 
 def extract_text_mt(doc_source):
-    return text_after_line_numbers(pdfdata_to_text(doc_source))
-
-url_mt =  'http://static.openstates.org/documents/mt/MTD00005634'
+    doc = lxml.html.fromstring(doc_source)
+    text = doc.xpath('//body')[0].text_content()
+    return text
+    
+url_mt = 'http://static.openstates.org/documents/mt/MTD00005634'
 doc_source_mt = urllib2.urlopen(url_mt).read()
 test_mt = extract_text_mt(doc_source_mt)
 
@@ -90,16 +92,8 @@ test_mt = extract_text_mt(doc_source_mt)
 
 def extract_text_ne(doc_source):
     text = pdfdata_to_text(doc_source)
-    lines = text.splitlines()
-    line_num_re = re.compile('\s*-\d+-')  # number:  -#-
-    for i, line in enumerate(lines):
-        if 'LEGISLATIVE RESOLUTION' in line:
-            break
-    text = ' '.join(line for line in lines[i:]
-                    if not line_num_re.match(line))
     return text
-
-url_ne = 'http://static.openstates.org/documents/ne/NED00050349'
+url_ne = 'http://static.openstates.org/documents/ne/NED00050004'
 doc_source_ne = urllib2.urlopen(url_ne).read()
 test_ne = extract_text_ne(doc_source_ne)
 
@@ -170,3 +164,64 @@ def extract_text_nc(doc_source):
 url_nc = 'http://static.openstates.org/documents/nc/NCD00003673'
 doc_source_nc =  urllib2.urlopen(url_nc).read()
 test_nc = extract_text_nc(doc_source_nc)
+
+
+#Idaho(ID)
+
+def extract_text_id(doc_source):
+    return text_after_line_numbers(pdfdata_to_text(doc_source))
+
+url_id = 'http://static.openstates.org/documents/id/IDD00000717'
+doc_source_id = urllib2.urlopen(url_id).read()
+test_id = extract_text_id(doc_source_id)
+
+#Illinois (IL)
+
+def extract_text_il(doc_source):
+    doc = lxml.html.fromstring(doc_source)
+    text = ' '.join(x.text_content() for x in doc.xpath('//td[@class="xsl"]'))
+    return text
+
+url_il = 'http://static.openstates.org/documents/il/ILD00012923'
+doc_source_il = urllib2.urlopen(url_il ).read()
+test_il = extract_text_il(doc_source_il)
+
+#Indiana
+
+def extract_text_in(doc_source):
+    text = pdfdata_to_text(doc_source)
+    return text_after_line_numbers(text)
+
+url_in = 'http://static.openstates.org/documents/in/IND00000313'
+doc_source_in = urllib2.urlopen(url_in).read()
+test_in = extract_text_in(doc_source_in)
+
+#Iowa (IA)
+
+def extract_text_ia(doc_source):
+    doc = lxml.html.fromstring(doc_source)
+    text = doc.xpath('//pre')[0].text_content()
+    # strip two sets of line numbers
+    return text_after_line_numbers(text_after_line_numbers(text))
+
+url_ia = 'http://static.openstates.org/documents/ia/IAD00005333'
+doc_source_ia = urllib2.urlopen(url_ia).read()
+test_ia =  extract_text_ia(doc_source_ia)
+
+#Kansas(KS)
+
+def extract_text_ks(doc_source):
+    return text_after_line_numbers(pdfdata_to_text(doc_source))
+
+url_ks = 'http://static.openstates.org/documents/ks/KSD00001620'
+doc_source_ks = urllib2.urlopen(url_ks).read()
+test_ks = extract_text_ks(doc_source_ks)
+
+#Kentucky (KY)
+
+def extract_text_ky(doc_source):
+    return worddata_to_text(doc_source)
+
+url_ky = 'http://static.openstates.org/documents/ky/KYD00002532'
+doc_source_ky = urllib2.urlopen(url_ky).read()
+test_ky = extract_text_ky(doc_source_ky)
