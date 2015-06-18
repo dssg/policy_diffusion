@@ -190,3 +190,10 @@ def wy_extract_text(doc_source):
 path = '/mnt/data/sunlight/dssg/scraped_bills/wy/2011/lower/HB_83.json'
 check_extractor(path, wy_extract_text, 'wy')
 
+#dc
+def dc_extract_text(doc_source):
+    lines = pdfdata_to_text(doc_source).splitlines()
+    no_big_indent = re.compile('^\s{0,10}\S')
+    text = '\n'.join(line for line in lines if no_big_indent.match(line))
+    return text
+
