@@ -82,7 +82,7 @@ test_mo = extract_text_mo(doc_source_mo)
 def extract_text_mt(doc_source):
     return text_after_line_numbers(pdfdata_to_text(doc_source))
 
-url_mt =  'http://static.openstates.org/documents/mt/MTD00005634'
+url_mt = http://static.openstates.org/documents/mt/MTD00005634
 doc_source_mt = urllib2.urlopen(url_mt).read()
 test_mt = extract_text_mt(doc_source_mt)
 
@@ -90,16 +90,8 @@ test_mt = extract_text_mt(doc_source_mt)
 
 def extract_text_ne(doc_source):
     text = pdfdata_to_text(doc_source)
-    lines = text.splitlines()
-    line_num_re = re.compile('\s*-\d+-')  # number:  -#-
-    for i, line in enumerate(lines):
-        if 'LEGISLATIVE RESOLUTION' in line:
-            break
-    text = ' '.join(line for line in lines[i:]
-                    if not line_num_re.match(line))
     return text
-
-url_ne = 'http://static.openstates.org/documents/ne/NED00050349'
+url_ne = 'http://static.openstates.org/documents/ne/NED00050004'
 doc_source_ne = urllib2.urlopen(url_ne).read()
 test_ne = extract_text_ne(doc_source_ne)
 
