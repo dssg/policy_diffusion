@@ -83,7 +83,7 @@ def extract_text_mt(doc_source):
     doc = lxml.html.fromstring(doc_source)
     text = doc.xpath('//body')[0].text_content()
     return text
-    
+
 url_mt = 'http://static.openstates.org/documents/mt/MTD00005634'
 doc_source_mt = urllib2.urlopen(url_mt).read()
 test_mt = extract_text_mt(doc_source_mt)
@@ -225,3 +225,11 @@ def extract_text_ky(doc_source):
 url_ky = 'http://static.openstates.org/documents/ky/KYD00002532'
 doc_source_ky = urllib2.urlopen(url_ky).read()
 test_ky = extract_text_ky(doc_source_ky)
+
+#Puerto Rico
+def extract_text_pr(doc, data):
+    return worddata_to_text(data)
+
+url_pr = ''
+doc_source_pr = urllib2.urlopen(url_pr).read()
+test_pr = extract_text_pr(doc_source_pr)
