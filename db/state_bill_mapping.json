@@ -1,7 +1,7 @@
 {
   "settings": {
     "number_of_shards": 1,
-    "number_of_replicas": 1
+    "number_of_replicas": 0
   },
   "mapping": {
     "bill_document": {
@@ -27,11 +27,14 @@
         },
         "bill_document_first": {
           "type": "string",
-          "index": "analyzed"
+          "index": "analyzed",
+          "_size": {"enabled" : true, "store" : true }
+
         },
         "bill_document_last": {
           "type": "string",
-          "index": "analyzed"
+          "index": "analyzed",
+          "_size": {"enabled" : true, "store" : true }
         },
         "bill_id": {
           "type": "string",
@@ -39,7 +42,8 @@
         },
         "bill_title": {
           "type": "string",
-          "index": "analyzed"
+          "index": "analyzed",
+          "_size": {"enabled" : true, "store" : true }
         },
         "bill_type": {
           "type": "string",
@@ -48,6 +52,16 @@
         "chamber": {
           "type": "string",
           "index": "not_analyzed"
+        },
+        "summary": {
+          "type": "string",
+          "index": "analyzed",
+          "_size": {"enabled" : true, "store" : true }
+        },
+        "short_title": {
+          "type": "string",
+          "index": "analyzed",
+          "_size": {"enabled" : true, "store" : true }
         },
         "date_created": {
           "type": "date"
