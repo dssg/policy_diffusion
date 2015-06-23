@@ -1,0 +1,133 @@
+{
+  "bill_document": {
+    "dynamic": "false",
+    "properties": {
+      "actions": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "index": "analyzed"
+          },
+          "actor": {
+            "type": "string",
+            "index": "analyzed"
+          },
+          "date": {
+            "type": "date",
+            "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+          },
+          "type": {
+            "type": "string",
+            "index": "not_analyzed"
+          }
+        }
+      },
+      "bill_document_first": {
+        "type": "string",
+        "term_vector": "yes",
+        "index": "analyzed",
+        "_size": {
+          "enabled": true,
+          "store": true
+        },
+        "fields": {
+                        "shingles": {
+                            "type":     "string",
+                            "analyzer": "my_shingle_analyzer"
+} }
+      },
+      "bill_document_last": {
+        "type": "string",
+        "term_vector": "yes",
+        "index": "analyzed",
+        "_size": {
+          "enabled": true,
+          "store": true
+        },
+        "fields": {
+                        "shingles": {
+                            "type":     "string",
+                            "analyzer": "my_shingle_analyzer"
+} }
+      },
+      "bill_id": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "bill_title": {
+        "type": "string",
+        "term_vector": "yes",
+        "index": "analyzed",
+        "_size": {
+          "enabled": true,
+          "store": true
+        },
+        "fields": {
+                        "shingles": {
+                            "type":     "string",
+                            "analyzer": "my_shingle_analyzer"
+} }
+      },
+      "bill_type": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "chamber": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "summary": {
+        "type": "string",
+        "term_vector": "yes",
+        "index": "analyzed",
+        "_size": {
+          "enabled": true,
+          "store": true
+        },
+        "fields": {
+                        "shingles": {
+                            "type":     "string",
+                            "analyzer": "my_shingle_analyzer"
+} }
+      },
+      "short_title": {
+        "type": "string",
+        "term_vector": "yes",
+        "index": "analyzed",
+        "_size": {
+          "enabled": true,
+          "store": true
+        },
+        "fields": {
+                        "shingles": {
+                            "type":     "string",
+                            "analyzer": "my_shingle_analyzer"
+} }
+      },
+      "date_created": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+      },
+      "date_updated": {
+        "type": "date",
+        "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd"
+      },
+      "session": {
+        "type": "string",
+        "index": "analyzed"
+      },
+      "state": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "sunlight_id": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "unique_id": {
+        "type": "string",
+        "index": "not_analyzed"
+      }
+    }
+  }
+}
