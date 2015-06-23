@@ -1,0 +1,28 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "analysis": {
+      "filter": {
+        "my_shingle_filter": {
+          "type": "shingle",
+          "min_shingle_size": 2,
+          "max_shingle_size": 5,
+          "output_unigrams": false
+        }
+      },
+      "analyzer": {
+        "my_shingle_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "my_shingle_filter"
+          ]
+        }
+      }
+    }
+  }
+}
