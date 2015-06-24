@@ -9,8 +9,7 @@
         "my_shingle_filter": {
           "type": "shingle",
           "min_shingle_size": 2,
-          "max_shingle_size": 5,
-          "output_unigrams": false
+          "max_shingle_size": 5
         }
       },
       "analyzer": {
