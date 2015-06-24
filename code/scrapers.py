@@ -10,6 +10,10 @@ import utils
 import random
 import argparse
 import traceback
+import urllib2
+from config import DATA_PATH
+from bs4 import BeautifulSoup
+
 
 try:
     from os import scandir, walk
@@ -50,7 +54,7 @@ def scrape_bill_document_from_sunlight(file_path):
         #define path to write file
         out_file_path = "/".join(file_path.split("/")[6:])
         out_file_path = re.sub("\s+", "_", out_file_path)
-        out_dir_root_path = "/mnt/data/sunlight/dssg/scraped_bills_new"
+        out_dir_root_path = "{0}/dssg/scraped_bills_new".format(DATA_PATH)
         out_file_name = "{0}/{1}.json".format(out_dir_root_path, out_file_path)
 
         bill_json = json.loads(codecs.open(file_path, encoding="utf8").read())
@@ -143,6 +147,136 @@ def scrape_bill_document_from_original_source(filePath):
     return
 
 
+# scrapes model legistlation from ALEC's official site
+# and the tracker website ALEC exposed
+def scrape_ALEC_model_legislation():
+    url = 'http://www.alec.org/model-legislation/'
+    response = urllib2.urlopen(url).read()
+    bs = BeautifulSoup(response, 'html5')
+
+    # Get all links from website
+    ALEClist = []
+    for link in bs.find_all('a'):
+        if link.has_attr('href'):
+            ALEClist.append(link.attrs['href'])
+
+    # Filter list so that we have only the ones with model-legislation
+    ALEClinks = []
+    i = 0
+    for i in range(0, len(ALEClist)):
+        if ALEClist[i][20:38] == "model-legislation/":
+            ALEClinks.append(ALEClist[i])
+            i = i + 1
+
+    # To get only unique links (get rid off duplicates)
+    ALEClinks = set(ALEClinks)
+
+    # Save to json file
+    with open('{0}/data/model_legislation/alec_bills.json'.format(DATA_PATH, 'w')) as f:
+        for line in ALEClinks:
+            source = urllib2.urlopen(line).read()
+            url = line
+            date = 2015
+            Jsonbill = bill_source_to_json(url, source, date)
+            f.write("{0}\n".format(Jsonbill))
+
+    # MATT: can we change this so it reads from /data and writes to /data
+    # Save old alec bills (from Center for the Media and Democracy)
+    names = os.listdir('{0}/dssg/model_legislation/ALEC_exposed'.format(DATA_PATH))
+    with open('alec_old_bills.json', 'w') as f2:
+        for name in names:
+            source2 = open(name, 'rb').read()
+            url2 = None
+            date2 = 2010 - 2013
+            Jsonbill2 = utils.bill_source_to_json(url2, source2, date2)
+            f2.write("{0}\n".format(Jsonbill2))
+
+
+
+def scrape_CSG_model_legislation():
+    url = 'http://www.csg.org/programs/policyprograms/SSL.aspx'
+    doc = urllib2.urlopen(url).read()
+    bs = BeautifulSoup(doc)
+
+    aliceLinks = []
+    for link in bs.find_all('a'):
+        if link.has_attr('href'):
+            candidate = link.attrs['href']
+            if candidate[-4:] == ".pdf":  # links with pdf extension tend to be model bills
+                aliceLinks.append(candidate)
+
+                # only keeps distinct links
+    aliceLinks = list(set(aliceLinks))
+
+    badCount = 0
+    goodCount = 0
+    with open('alice_bills.json', 'w') as f:
+        for link in aliceLinks:
+            # url_key = {}
+            # source = urllib2.urlopen(link).read()
+            # Jsonbill = bill_source_to_json(link, source, None)
+            # f.write("{0}\n".format(Jsonbill))
+            try:
+                url_key = {}
+                source = urllib2.urlopen(link).read()
+                Jsonbill = bill_source_to_json(link, source, None)
+                f.write("{0}\n".format(Jsonbill))
+                goodCount += 1
+                print goodCount
+            except:
+                badCount += 1
+
+    print str(badCount) + " did not work"
+
+
+def scrape_ALICE_legislation():
+    path = "/Users/jkatzsamuels/Desktop/dssg/sunlight/test_code/csg_files/links_"
+    lines = []
+    for i in [1, 2, 3]:
+        filePath = path + str(i) + ".txt"
+        with open(filePath) as f:
+            lines.extend(f.read().splitlines())
+
+    text = ''.join(lines)
+    bs = BeautifulSoup(text)
+
+    links = []
+    for link in bs.find_all('a'):
+        if link.has_attr('href'):
+            links.append(link.attrs['href'])
+
+
+    # grab pdfs from links
+    billList = []
+    for url in links:
+        doc = urllib2.urlopen(url).read()
+        bs = BeautifulSoup(doc)
+
+        for link in bs.find_all('a'):
+            if link.has_attr('href'):
+                candidate = link.attrs['href']
+                if candidate[-4:] == ".pdf":  # links with pdf extension tend to be model bills
+                    billList.append("https://stateinnovation.org" + candidate)
+
+    badCount = 0
+    goodCount = 0
+    with open('csg_bills.json', 'w') as f:
+        for link in billList:
+            # url_key = {}
+            # source = urllib2.urlopen(link).read()
+            # Jsonbill = bill_source_to_json(link, source, None)
+            # f.write("{0}\n".format(Jsonbill))
+            try:
+                source = urllib2.urlopen(link).read()
+                Jsonbill = bill_source_to_json(link, source, None)
+                f.write("{0}\n".format(Jsonbill))
+                goodCount += 1
+                print goodCount
+            except:
+                badCount += 1
+
+    print str(badCount) + " did not work"
+
 
 
 def main():
@@ -159,6 +293,12 @@ def main():
 
     if args.command == "scrape_bills_from_sunlight":
         scrape_all_bills(args.data_path,args.num_workers)
+    elif args.command == "scrape_ALEC_legislation":
+        scrape_ALEC_model_legislation()
+    elif args.command == "scrape_CSG_legislation":
+        scrape_CSG_model_legislation()
+    elif args.command == "scrape_ALICE_legislation":
+        scrape_ALICE_legislation()
     else:
         print("command not recognized, use -h flag to see list available commands")
 
