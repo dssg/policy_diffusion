@@ -10,20 +10,18 @@ import subprocess
 PUNCTUATION = re.compile('[%s]' % re.escape(string.punctuation))
 
 
-
-
 def convert_pdf(filename, type='xml'):
     commands = {'text': ['pdftotext', '-layout', filename, '-'],
-                'text-nolayout': ['pdftotext', filename, '-'],
-                'xml': ['pdftohtml', '-xml', '-stdout', filename],
-                'html': ['pdftohtml', '-stdout', filename]}
+            'text-nolayout': ['pdftotext', filename, '-'],
+            'xml': ['pdftohtml', '-xml', '-stdout', filename],
+            'html': ['pdftohtml', '-stdout', filename]}
     try:
         pipe = subprocess.Popen(commands[type], stdout=subprocess.PIPE,
-                                close_fds=True).stdout
+                close_fds=True).stdout
     except OSError as e:
         raise EnvironmentError("error running %s, missing executable? [%s]" %
-                               ' '.join(commands[type]), e)
-    data = pipe.read()
+                ' '.join(commands[type]), e)
+        data = pipe.read()
     pipe.close()
     return data
 
@@ -42,7 +40,7 @@ def worddata_to_text(data):
             tmpf.write(data)
             tmpf.flush()
             subprocess.check_call(['timeout', '10', 'abiword',
-                                   '--to=%s' % txtfile, tmpf.name])
+                '--to=%s' % txtfile, tmpf.name])
             f = open(txtfile)
             text = f.read()
             tmpf.close()
