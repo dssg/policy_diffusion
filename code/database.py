@@ -111,8 +111,39 @@ class SunlightElasticConnection():
 
         return result_docs
 
+    def grabAllBills(self, step = 3000):
+        es = self.es_connection
 
+        body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) + ', "query":{"bool":{"must":{"match_all":{}}}}} '
 
+        body = body_gen(0,0)
+        bills = es.search(index="state_bills", body=body)
+
+        total = bills['hits']['total']
+
+        all_bills = []
+        start = 0
+        bad_count = 0
+        while start <= total:
+            body = body_gen(start,step)
+            bills = es.search(index="state_bills", body=body)
+            bill_list = bills['hits']['hits']
+            all_bills.append(bill_list)
+            
+            start +=  step
+
+        return all_bills
+
+    def grabStateBills(self, state, step = 3000):
+        es = self.es_connection
+
+        bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
+        total = bills['hits']['total']
+        body = '{"size":' + str(total) + \
+                ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
+        bills = es.search(index="state_bills", body=body)
+
+        return [b['_source'] for b in bills['hits']['hits']]
 
 
 ## main function that manages unix interface
