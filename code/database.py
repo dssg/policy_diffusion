@@ -111,7 +111,7 @@ class SunlightElasticConnection():
 
         return result_docs
 
-    def grabAllBills(self, step = 3000):
+    def get_all_bills(self, step = 3000):
         es = self.es_connection
 
         body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) + ', "query":{"bool":{"must":{"match_all":{}}}}} '
@@ -134,7 +134,7 @@ class SunlightElasticConnection():
 
         return all_bills
 
-    def grabStateBills(self, state, step = 3000):
+    def get_bills_by_state(self, state, step = 3000):
         es = self.es_connection
 
         bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
