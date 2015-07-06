@@ -3,7 +3,6 @@ import urllib2 as urllib
 import json
 import pprint
 
-
 query = {
   "aggs": {
     "group_by_state": {
@@ -30,7 +29,7 @@ es = Elasticsearch(['54.212.36.132:9200', '54.212.36.132:9200'])
 search_ga = es.search(index="state_bills", body={"query": {"match": {'state':'ga'}}})
 count_ga = es.count(index="state_bills", body={"query": {"match": {'state':'ga'}}})
 
-#Queries, by state, by chamber, by chamber and state
+#Queries from elasticsearch
 group_by_state = es.search(index="state_bills", body={"size":0,"aggs":{"group_by_state":{"terms":{"field":"state"}}}})
 
 group_by_chamber = es.search(index="state_bills", body={"size":0,"aggs":{"group_by_state":{"terms":{"field":"state"}}},
@@ -53,6 +52,9 @@ significant_terms_bystate = es.search(index="state_bills", body= {"size" : 0,
         }
     }
 })
+
+
+
 
 
 
