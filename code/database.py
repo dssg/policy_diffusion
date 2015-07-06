@@ -10,14 +10,22 @@ MODEL_LEGISLATION_INDEX = "model_legistlation"
 #ES_CONNECTION = Elasticsearch(timeout=300)
 ES_CONNECTION = Elasticsearch([{'host': '54.212.36.132', 'port': 9200}],timeout = 300)
 
+class TestToe():
 
-class SunlightElasticConnection():
+    def __init__(self,toe_type ="big",toe_size = 3):
+        self.toe = toe_type
+        self.toe_size = toe_size
+        print self.toe,self.toe_size
+    
 
-    def __init__(host = "localhost",port = 9200):
+
+class ElasticConnection():
+
+    def __init__(self,host = "localhost",port = 9200):
         self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 300)
 
     # bulk loads all json files in subdirectory
-    def load_bulk_bills(bill_directory):
+    def load_bulk_bills(self,bill_directory):
         ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout = 100)
         bulk_data = []
         ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout=100)
@@ -26,7 +34,7 @@ class SunlightElasticConnection():
 
     # creates index for bills and model legislation stored in
     # data_path, overwriting index if it is already created
-    def create_index(data_path):
+    def create_index(self,data_path):
         if ES_CONNECTION.indices.exists(STATE_BILL_INDEX):
             print("deleting '%s' index..." % (STATE_BILL_INDEX))
             ES_CONNECTION.indices.delete(index=STATE_BILL_INDEX)
@@ -68,34 +76,32 @@ class SunlightElasticConnection():
 
 
 
-    def query_state_bills(query,index_name = STATE_BILL_INDEX):
-
+    def query_state_bills(self,query):
         json_query = {
                 "query": {
                     "bool": {
-                            "should": {
-                        "match": {
-                          "bill_document_last.shingles": query
+                        "should": {
+                            "match": {
+                                "bill_document_last.shingles": query
+                                }
+                            }
                         }
-                      }
-                    }
-                  },
-                  "highlight": {
+                    },
+                "highlight": {
                     "pre_tags": [
-                      "<mark>"
-                    ],
+                        "<mark>"
+                        ],
                     "post_tags": [
-                      "</mark>"
-                    ],
+                        "</mark>"
+                        ],
                     "fields": {
-                      "bill_document_last.shingles": {
-                        "number_of_fragments": 0
-                      }
+                        "bill_document_last.shingles": {
+                            "number_of_fragments": 0
+                            }
+                        }
                     }
-                  }
                 }
-        
-        
+
         results = ES_CONNECTION.search(index = STATE_BILL_INDEX,body = json_query)
         results = results['hits']['hits']
         result_docs = []
