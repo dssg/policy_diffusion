@@ -88,14 +88,16 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
         mismatchScore: num
         gapScore: num
     Returns:
-        alignment object
+        o/w returns list of tuples with score and top alignments
     Description:
         helper function for finding alignments given a list of words
     '''
     # Create a vocabulary and encode the sequences.
+    seq1 = Sequence(a)
+    seq2 = Sequence(b)
     v = Vocabulary()
-    aEncoded = v.encodeSequence(a)
-    bEncoded = v.encodeSequence(b)
+    aEncoded = v.encodeSequence(seq1)
+    bEncoded = v.encodeSequence(seq2)
 
     # Create a scoring and align the sequences using local aligner.
     scoring = SimpleScoring(matchScore, mismatchScore)
@@ -103,7 +105,11 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
     score, encodeds = aligner.align(aEncoded, bEncoded, backtrace=True)
     alignments = [v.decodeSequenceAlignment(encoded) for encoded in encodeds]
 
-    return Alignment(score, alignments)
+    return [(a.score, a.first, a.second) for a in alignments]
+    # if return_tup == 1:
+    #     return [(a.score, a.first, a.second) for a in alignments]
+    # else:
+    #     return Alignment(score, alignments)
 
 def seqToSeqSyn(words, syn):
     '''
@@ -122,6 +128,53 @@ def seqToSeqSyn(words, syn):
             words[i] = str(syn.centerToRepNum[center])
 
 	return words
+
+
+def cleanAlignment(alignment):
+    '''
+    arg:
+        alignment object
+    returns:
+        2 list of alignment words without the alignment symbol
+
+    '''
+    gap = alignment.gap
+    keep1 = []
+    keep2 = []
+    for item in alignment.first:
+        if item != gap:
+            keep1.append(item)
+
+    for item in alignment.second:
+        if item != gap:
+            keep2.append(item)
+
+    return (keep1, keep2)
+
+def contains(s,q):
+    '''
+    is the list s contained in q in order and if it is what are indices
+    '''
+    # largest = 0
+    # start = 0
+    # end = 0
+    for i in range(len(q)):
+        T = True
+        for j in range(len(s)):
+            # if largest < j:
+            #     start = i
+            #     end = i +j
+            #     largest = end - start
+            # print "largest: " + str(largest)
+            # print "j: " + str(j)
+            # print "i: " + str(i)
+            if s[j] != q[i+j]:
+                T = False
+                break
+        if T:
+            return (i, i + j + 1)
+    return (0,0)
+
 
 #################
 #Main Functions
@@ -182,24 +235,59 @@ TODO: Strategy for finding piece of text that is matched:
 
 '''
 
-def check_alignment(text1, text2, align_fcn): #TODO: currently not written to use word2vec
+
+#################
+#Evaluation Functions
+
+def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currently not written to use word2vec or to input parameters
     '''
     args: 
         text1: string
         text2: string
         align_fcn: alignment function to apply to the text
+        surround_text: number of words to include before and after alignment in original text
     Returns:
         prints best alignment, score, surrounding text for given alignment
     Description:
         function for examining matches produced by alignment function
     '''
+    aligns = align_fcn(text1, text2)
+    alignment = aligns.alignments[0]
+    seq1 = text1.split()
+    seq2 = text2.split()
 
+    align_clean_1, align_clean_2 = cleanAlignment(alignment)
+
+    [i,j] = contains(align_clean_1, seq1)
+    [k,l] = contains(align_clean_2, seq2)
+
+    print "i,j: " + str((i,j))
+    print "k,l: " + str((k,l))
+
+    print "alignment score: " + str(alignment.score)
+    print '\n'
+    
+    print "first alignment: " + '\n' + ' '.join(align_clean_1)
+    print '\n'
+
+    print "first alignment text: " + '\n' + ' '.join(seq1[max(i-surround_text, 0): j+surround_text])
+    print '\n'
+
+    print "second alignment: " + '\n' + ' '.join(align_clean_2)
+    print '\n'    
+
+    print "second alignment text: " + '\n' + ' '.join(seq2[max(k-surround_text, 0): l+surround_text])
+
+    return alignment
+
+def main():
+    print "main"
 
 
 
 
 if __name__ == '__main__':
-
+    main()
     print "loading data"
     #urls to known matches
     matches = ['http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm'
@@ -247,18 +335,22 @@ if __name__ == '__main__':
     for key in keys_to_delete:
         del ids[key]
 
+    text1 = ids[2]['text']
+    text2 = ids[3]['text']
 
-    #get text from all of these docs
-    #flatten sentences
-    texts = [value['text'] for (key,value) in ids.iteritems()]
-    text = ''
-    for t in texts:
-        text += t
-    sentences = sent_tokenize(text)
-    sentences = [s.encode('utf-8').split() for s in sentences]
 
-    #run word2vec
-    print "training word2vec"
-    model = Word2Vec(sentences)
+
+#     #get text from all of these docs
+#     #flatten sentences
+#     texts = [value['text'] for (key,value) in ids.iteritems()]
+#     text = ''
+#     for t in texts:
+#         text += t
+#     sentences = sent_tokenize(text)
+#     sentences = [s.encode('utf-8').split() for s in sentences]
+
+#     #run word2vec
+#     print "training word2vec"
+#     model = Word2Vec(sentences)
 
 
