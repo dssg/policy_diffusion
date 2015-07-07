@@ -142,7 +142,7 @@ class ElasticConnection():
 
         return all_bills
 
-    def get_bills_by_state(self, state, step = 3000):
+    def get_bills_by_state(self, state):
         es = self.es_connection
 
         bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
