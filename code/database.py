@@ -34,7 +34,7 @@ class ElasticConnection():
 
     # creates index for bills and model legislation stored in
     # data_path, overwriting index if it is already created
-    def create_index(self,data_path):
+    def create_state_bill_index(self,data_path):
         if ES_CONNECTION.indices.exists(STATE_BILL_INDEX):
             print("deleting '%s' index..." % (STATE_BILL_INDEX))
             ES_CONNECTION.indices.delete(index=STATE_BILL_INDEX)
@@ -75,6 +75,7 @@ class ElasticConnection():
                 bulk_data = []
 
 
+    
 
     def query_state_bills(self,query):
         json_query = {
@@ -113,6 +114,7 @@ class ElasticConnection():
             doc['bill_id'] = res['_source']['unique_id']
             doc['state'] = res['_source']['state']
             doc['title'] = res['_source']['bill_title']
+            
             result_docs.append(doc)
 
         return result_docs
