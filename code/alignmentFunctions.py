@@ -19,6 +19,7 @@ from collections import defaultdict
 
 import urllib2
 from tika import parser
+import nltk
 
 #################
 class Alignment:
@@ -130,7 +131,7 @@ def seqToSeqSyn(words, syn):
 	return words
 
 
-def cleanAlignment(alignment):
+def cleanAlignment(alignment, gap = '-'):
     '''
     arg:
         alignment object
@@ -138,14 +139,13 @@ def cleanAlignment(alignment):
         2 list of alignment words without the alignment symbol
 
     '''
-    gap = alignment.gap
     keep1 = []
     keep2 = []
-    for item in alignment.first:
+    for item in alignment[1]:
         if item != gap:
             keep1.append(item)
 
-    for item in alignment.second:
+    for item in alignment[2]:
         if item != gap:
             keep2.append(item)
 
@@ -176,6 +176,16 @@ def contains(s,q):
     return (0,0)
 
 
+def printdiff(alignment, gap = '-'):
+    a = alignment[1]
+    b = alignment[2]
+    length = max(len(alignment[1]), len(alignment[2]))
+    for i in range(length):
+        if a[i] == b[i] or a[i] == gap or b[i] == gap:
+            continue
+        else:
+            print a[i], b[i]
+
 #################
 #Main Functions
 
@@ -192,7 +202,7 @@ def align(text1, text2, matchScore = 3, mismatchScore = -1, gapScore = -2):
     Description:
         function for finding local alignments (with no synonym modification)
     '''
-    return seqToAlign(text1.split(), text2.split(), matchScore , mismatchScore, gapScore)
+    return seqToAlign(nltk.word_tokenize(text1), nltk.word_tokenize(text2), matchScore , mismatchScore, gapScore)
 
 
 def word2vecAlign(text1, text2, word2vec_model,threshold = .05, matchScore = 3, mismatchScore = -1, gapScore = -2):
@@ -210,8 +220,8 @@ def word2vecAlign(text1, text2, word2vec_model,threshold = .05, matchScore = 3, 
     Description:
         function for finding local alignments (with no synonym modification)
     '''
-    seq1 = text1.split()
-    seq2 = text2.split()
+    seq1 = nltk.word_tokenize(text1)
+    seq2 = nltk.word_tokenize(text2)
 
     #make synonym object and create synonyms
     syn = Synonyms(threshold, word2vec_model)
@@ -252,9 +262,9 @@ def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currentl
         function for examining matches produced by alignment function
     '''
     aligns = align_fcn(text1, text2)
-    alignment = aligns.alignments[0]
-    seq1 = text1.split()
-    seq2 = text2.split()
+    alignment = aligns[0]
+    seq1 = nltk.word_tokenize(text1)
+    seq2 = nltk.word_tokenize(text2)
 
     align_clean_1, align_clean_2 = cleanAlignment(alignment)
 
@@ -264,7 +274,7 @@ def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currentl
     print "i,j: " + str((i,j))
     print "k,l: " + str((k,l))
 
-    print "alignment score: " + str(alignment.score)
+    print "alignment score: " + str(alignment[0])
     print '\n'
     
     print "first alignment: " + '\n' + ' '.join(align_clean_1)
@@ -277,17 +287,13 @@ def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currentl
     print '\n'    
 
     print "second alignment text: " + '\n' + ' '.join(seq2[max(k-surround_text, 0): l+surround_text])
+    print '\n'
 
-    return alignment
+    printdiff(alignment)
+
+    # return alignment
 
 def main():
-    print "main"
-
-
-
-
-if __name__ == '__main__':
-    main()
     print "loading data"
     #urls to known matches
     matches = ['http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm'
@@ -338,6 +344,21 @@ if __name__ == '__main__':
     text1 = ids[2]['text']
     text2 = ids[3]['text']
 
+    for i in ids.keys():
+        for j in ids.keys():
+            if i < j:
+                text1 = ids[i]['text'] 
+                text2 = ids[j]['text']
+
+                check_alignment(text1,text2)
+                raw_input("Press Enter to continue...")
+
+
+
+if __name__ == '__main__':
+    main()
+
+               
 
 
 #     #get text from all of these docs
