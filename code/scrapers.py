@@ -54,16 +54,10 @@ def scrape_bill_document_from_sunlight(file_path):
         #define path to write file
         out_file_path = "/".join(file_path.split("/")[6:])
         out_file_path = re.sub("\s+", "_", out_file_path)
-        out_dir_root_path = "{0}/dssg/scraped_bills_new".format(DATA_PATH)
+        out_dir_root_path = "{0}/scraped_bills".format(DATA_PATH)
         out_file_name = "{0}/{1}.json".format(out_dir_root_path, out_file_path)
 
         bill_json = json.loads(codecs.open(file_path, encoding="utf8").read())
-
-        # filters documents that are resolutions
-        bill_text_count = [1 for x in bill_json['type'] if "bill" in x.lower()]
-        if sum(bill_text_count) < 1:
-            return
-
 
         # filter versions to be only the first and last
         try:
@@ -73,6 +67,7 @@ def scrape_bill_document_from_sunlight(file_path):
 
         base_url = "{0}/{1}".format("http://static.openstates.org/documents", bill_json['state'])
         urls = ["{0}/{1}".format(base_url, x['doc_id']) for x in bill_json['versions']]
+        source_urls = [x['url'] for x in bill_json['versions']]
 
         for i, url in enumerate(urls):
 
@@ -82,7 +77,8 @@ def scrape_bill_document_from_sunlight(file_path):
             if bill_document is not None:
                 bill_document = base64.b64encode(bill_document)
             else:
-                logging.error("file {0}, url {1}, version {2}, error: << {3} >>".format(file_path, url, i, "link error"))
+                logging.error("file {0}, url {1}, version {2}, error: << {3} >>".format(
+                    file_path, url, i, "link error"))
 
             bill_json['versions'][i]['bill_document'] = bill_document
 
