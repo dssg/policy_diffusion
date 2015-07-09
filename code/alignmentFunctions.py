@@ -11,7 +11,7 @@ from alignment.sequencealigner import SimpleScoring, GlobalSequenceAligner, Loca
 from gensim.models import Word2Vec
 
 #nltk
-from nltk.tokenize import sent_tokenize
+# from nltk.tokenize import sent_tokenize
 
 #other
 import numpy as np
@@ -106,7 +106,7 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
     score, encodeds = aligner.align(aEncoded, bEncoded, backtrace=True)
     alignments = [v.decodeSequenceAlignment(encoded) for encoded in encodeds]
 
-    return [(a.score, list(a.first), list(a.second)) for a in alignments]
+    return [(a.score, list(a.first), list(a.second) for a in alignments]
     # if return_tup == 1:
     #     return [(a.score, a.first, a.second) for a in alignments]
     # else:
