@@ -1,0 +1,17 @@
+mark {
+    background-color: yellow;
+    color: black;
+}
+
+.span3 {  
+    height: 250px !important;
+    overflow: scroll;
+}
+
+.span5 {  
+    height: 800px !important;
+    overflow: scroll;
+}
+td { 
+    padding: 7px;
+}
