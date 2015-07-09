@@ -163,7 +163,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "build_index":
-        create_index(args.data_path)
+        ec = ElasticConnection()
+        ec.create_state_bill_index(args.data_path)
     else:
         print args
 
