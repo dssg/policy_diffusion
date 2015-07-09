@@ -21,6 +21,8 @@ import urllib2
 from tika import parser
 import nltk
 
+import json
+
 #################
 class Alignment:
     def __init__(self, score, alignments):
@@ -106,7 +108,7 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
     score, encodeds = aligner.align(aEncoded, bEncoded, backtrace=True)
     alignments = [v.decodeSequenceAlignment(encoded) for encoded in encodeds]
 
-    return [(a.score, list(a.first), list(a.second) for a in alignments]
+    return [(a.score, list(a.first), list(a.second)) for a in alignments]
     # if return_tup == 1:
     #     return [(a.score, a.first, a.second) for a in alignments]
     # else:
@@ -176,15 +178,19 @@ def contains(s,q):
     return (0,0)
 
 
-def printdiff(alignment, gap = '-'):
+def diff(alignment, gap = '-'):
     a = alignment[1]
     b = alignment[2]
     length = max(len(alignment[1]), len(alignment[2]))
+
+    diff = []
     for i in range(length):
         if a[i] == b[i] or a[i] == gap or b[i] == gap:
             continue
         else:
-            print a[i], b[i]
+            diff.append((a[i], b[i]))
+
+    return diff
 
 #################
 #Main Functions
@@ -249,8 +255,7 @@ TODO: Strategy for finding piece of text that is matched:
 #################
 #Evaluation Functions
 
-
-def create_matches(ls):
+def create_bills(ls):
     '''
     args:
         ls: list of lists of urls that correspond to matches
@@ -263,16 +268,30 @@ def create_matches(ls):
     bills = {}
     for urls in ls:
         for url in urls:
-            print "bill_id: " + str(bill_id)
-            bills[bill_id] = {}
-            doc = urllib2.urlopen(url).read()
-            text = parser.from_buffer(doc)['content']
-            bills[bill_id]['url'] = url
-            bills[bill_id]['text'] = text
-            bills[bill_id]['match'] = k
+            try:
+                print "bill_id: " + str(bill_id)
+                bills[bill_id] = {}
+                doc = urllib2.urlopen(url).read()
+                text = parser.from_buffer(doc)['content']
+
+                print text
+                
+                bills[bill_id]['url'] = url
+                bills[bill_id]['text'] = text
+                bills[bill_id]['match'] = k
+            except:
+                pass
             bill_id += 1
         k += 1
-    return matches
+
+    try:
+        for bill in bills.keys():
+            if bills[bill]['text'] == '':
+                del bills[bill]
+    except:
+        pass
+
+    return bills
 
 
 def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currently not written to use word2vec or to input parameters
@@ -285,7 +304,7 @@ def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currentl
     Returns:
         prints best alignment, score, surrounding text for given alignment
     Description:
-        function for examining matches produced by alignment function
+        function for examining matches of pair of texts produced by alignment function
     '''
     aligns = align_fcn(text1, text2)
     alignment = aligns[0]
@@ -315,22 +334,82 @@ def check_alignment(text1, text2, align_fcn, surround_text = 6): #TODO: currentl
     print "second alignment text: " + '\n' + ' '.join(seq2[max(k-surround_text, 0): l+surround_text])
     print '\n'
 
-    printdiff(alignment)
+    print diff(alignment)
 
     # return alignment
 
+
+def evaluate_algorithm(evals):
+    '''
+    args:
+        matches: dictionary with field corresponding to text and match groups
+
+    returns:
+        matrix with scores between all pairs and a dictionary with information
+    '''
+    scores = np.zeros((max(evals.keys())+1, max(evals.keys())+1))
+
+    results = {}
+
+    for i in evals.keys():
+        for j in evals.keys():
+            if i < j: #local alignment gives symmetric distance
+                text1 = evals[i]['text']
+                text2 = evals[j]['text']
+
+                # Create sequences to be aligned.
+                alignments = align(evals)
+
+                scores[i,j] = alignment[0][0]
+
+                results[(i,j)] ={}
+                results[(i,j)]['alignments'] = [(alignment[1], alignment[2]) for alignment in alignments]
+
+                results[(i,j)] = diff(alignment[1], alignment[2])
+
+    return scores, results
+
+
+def plot_scores(scores, evals):
+
+    matchScores = []
+    nonMatchScores = []
+
+    for i in evals.keys():
+        for j in evals.keys():
+            if scores[i,j] == 0:
+                #ignore if score zero because url is broken
+                pass
+            elif i < j and evals[i]['match'] == evals[j]['match']:
+                matchScores.append(scores[i,j])
+            else:
+                nonMatchScores.append(scores[i,j])
+
+    val = 0. 
+    plt.plot(matchScores, np.zeros_like(matchScores), 'o')
+    plt.plot(nonMatchScores, np.zeros_like(nonMatchScores), 'x')
+    plt.plot()
+    plt.show()
+
 def main():
     print "loading data"
+
+    bills = json.loads('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/eval.json')
+
+    scores, results = evaluate_algorithm(bills)
+
+    plot_scores(scores, evals) 
+
     #urls to known matches
-    matches = ['http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm'
-                'http://www.schouse.gov/sess116_2005-2006/bills/4301.htm',
-                'http://www.legis.state.wv.us/Bill_Text_HTML/2008_SESSIONS/RS/Bills/hb2564%20intr.html'
-                'http://www.lrc.ky.gov/record/06rs/SB38.htm',
-                'http://www.okhouse.gov/Legislation/BillFiles/hb2615cs%20db.PDF',
-                'https://docs.legis.wisconsin.gov/2011/related/proposals/ab69',
-                'http://legisweb.state.wy.us/2008/Enroll/HB0137.pdf',
-                'http://www.kansas.gov/government/legislative/bills/2006/366.pdf',
-                'http://billstatus.ls.state.ms.us/documents/2006/pdf/SB/2400-2499/SB2426SG.pdf']
+    # matches = ['http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm'
+    #             'http://www.schouse.gov/sess116_2005-2006/bills/4301.htm',
+    #             'http://www.legis.state.wv.us/Bill_Text_HTML/2008_SESSIONS/RS/Bills/hb2564%20intr.html'
+    #             'http://www.lrc.ky.gov/record/06rs/SB38.htm',
+    #             'http://www.okhouse.gov/Legislation/BillFiles/hb2615cs%20db.PDF',
+    #             'https://docs.legis.wisconsin.gov/2011/related/proposals/ab69',
+    #             'http://legisweb.state.wy.us/2008/Enroll/HB0137.pdf',
+    #             'http://www.kansas.gov/government/legislative/bills/2006/366.pdf',
+    #             'http://billstatus.ls.state.ms.us/documents/2006/pdf/SB/2400-2499/SB2426SG.pdf']
 
     #urls to nonmatches
     # nonMatches = ['http://www.alec.org/model-legislation/21st-century-commercial-nexus-act/',
@@ -341,13 +420,13 @@ def main():
     #                 'http://www.alec.org/model-legislation/anti-phishing-act/']
 
     #create id dictionary
-    k = 0
-    ids = {}
-    while matches != []:
-        ids[k] = {}
-        ids[k]['url']  = matches.pop()
-        ids[k]['match'] = 1 #is stand your ground act
-        k += 1
+    # k = 0
+    # ids = {}
+    # while matches != []:
+    #     ids[k] = {}
+    #     ids[k]['url']  = matches.pop()
+    #     ids[k]['match'] = 1 #is stand your ground act
+    #     k += 1
 
     # while nonMatches != []:
     #     ids[k] = {}
@@ -355,20 +434,20 @@ def main():
     #     ids[k]['match'] = 0 #not stand your ground act
     #     k += 1
 
-    keys_to_delete = [] 
-    for key, value in ids.iteritems():    
-        try:
-            doc = urllib2.urlopen(value['url']).read()
-            ids[key]['text'] = parser.from_buffer(doc)['content']
-        except:
-            keys_to_delete.append(key)
+    # keys_to_delete = [] 
+    # for key, value in ids.iteritems():    
+    #     try:
+    #         doc = urllib2.urlopen(value['url']).read()
+    #         ids[key]['text'] = parser.from_buffer(doc)['content']
+    #     except:
+    #         keys_to_delete.append(key)
 
-    #delete keys with broken urls
-    for key in keys_to_delete:
-        del ids[key]
+    # #delete keys with broken urls
+    # for key in keys_to_delete:
+    #     del ids[key]
 
-    text1 = ids[2]['text']
-    text2 = ids[3]['text']
+    # text1 = ids[2]['text']
+    # text2 = ids[3]['text']
 
     # for i in ids.keys():
     #     for j in ids.keys():
@@ -464,5 +543,9 @@ if __name__ == '__main__':
 #     #run word2vec
 #     print "training word2vec"
 #     model = Word2Vec(sentences)
+
+
+
+
 
 
