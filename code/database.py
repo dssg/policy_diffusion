@@ -142,16 +142,30 @@ class ElasticConnection():
 
         return all_bills
 
-    def get_bills_by_state(self, state):
+    def get_bills_by_state(self, state, num_bills = 'all', step = 3000):
         es = self.es_connection
 
-        bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
-        total = bills['hits']['total']
-        body = '{"size":' + str(total) + \
-                ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
-        bills = es.search(index="state_bills", body=body)
+        if num_bills != 'all':
+            bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
+            total = bills['hits']['total']
+        else:
+            total = num_bills
 
-        return [b['_source'] for b in bills['hits']['hits']]
+        body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) +  ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
+
+
+        all_bills = []
+        start = 0
+        bad_count = 0
+        while start <= total:
+            body = body_gen(start,step)                   
+            bills = es.search(index="state_bills", body=body)
+            bill_list = bills['hits']['hits']
+            all_bills.append(bill_list)
+
+            start +=  step
+
+        return all_bills
 
 
 ## main function that manages unix interface
