@@ -10,14 +10,22 @@ MODEL_LEGISLATION_INDEX = "model_legistlation"
 #ES_CONNECTION = Elasticsearch(timeout=300)
 ES_CONNECTION = Elasticsearch([{'host': '54.212.36.132', 'port': 9200}],timeout = 300)
 
+class TestToe():
 
-class SunlightElasticConnection():
+    def __init__(self,toe_type ="big",toe_size = 3):
+        self.toe = toe_type
+        self.toe_size = toe_size
+        print self.toe,self.toe_size
+    
 
-    def __init__(host = "localhost",port = 9200):
+
+class ElasticConnection():
+
+    def __init__(self,host = "localhost",port = 9200):
         self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 300)
 
     # bulk loads all json files in subdirectory
-    def load_bulk_bills(bill_directory):
+    def load_bulk_bills(self,bill_directory):
         ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout = 100)
         bulk_data = []
         ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout=100)
@@ -26,7 +34,7 @@ class SunlightElasticConnection():
 
     # creates index for bills and model legislation stored in
     # data_path, overwriting index if it is already created
-    def create_index(data_path):
+    def create_state_bill_index(self,data_path):
         if ES_CONNECTION.indices.exists(STATE_BILL_INDEX):
             print("deleting '%s' index..." % (STATE_BILL_INDEX))
             ES_CONNECTION.indices.delete(index=STATE_BILL_INDEX)
@@ -67,35 +75,34 @@ class SunlightElasticConnection():
                 bulk_data = []
 
 
+    
 
-    def query_state_bills(query,index_name = STATE_BILL_INDEX):
-
+    def query_state_bills(self,query):
         json_query = {
                 "query": {
                     "bool": {
-                            "should": {
-                        "match": {
-                          "bill_document_last.shingles": query
+                        "should": {
+                            "match": {
+                                "bill_document_last.shingles": query
+                                }
+                            }
                         }
-                      }
-                    }
-                  },
-                  "highlight": {
+                    },
+                "highlight": {
                     "pre_tags": [
-                      "<mark>"
-                    ],
+                        "<mark>"
+                        ],
                     "post_tags": [
-                      "</mark>"
-                    ],
+                        "</mark>"
+                        ],
                     "fields": {
-                      "bill_document_last.shingles": {
-                        "number_of_fragments": 0
-                      }
+                        "bill_document_last.shingles": {
+                            "number_of_fragments": 0
+                            }
+                        }
                     }
-                  }
                 }
-        
-        
+
         results = ES_CONNECTION.search(index = STATE_BILL_INDEX,body = json_query)
         results = results['hits']['hits']
         result_docs = []
@@ -107,6 +114,7 @@ class SunlightElasticConnection():
             doc['bill_id'] = res['_source']['unique_id']
             doc['state'] = res['_source']['state']
             doc['title'] = res['_source']['bill_title']
+            
             result_docs.append(doc)
 
         return result_docs
@@ -134,16 +142,30 @@ class SunlightElasticConnection():
 
         return all_bills
 
-    def get_bills_by_state(self, state, step = 3000):
+    def get_bills_by_state(self, state, num_bills = 'all', step = 3000):
         es = self.es_connection
 
-        bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
-        total = bills['hits']['total']
-        body = '{"size":' + str(total) + \
-                ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
-        bills = es.search(index="state_bills", body=body)
+        if num_bills != 'all':
+            bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
+            total = bills['hits']['total']
+        else:
+            total = num_bills
 
-        return [b['_source'] for b in bills['hits']['hits']]
+        body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) +  ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
+
+
+        all_bills = []
+        start = 0
+        bad_count = 0
+        while start <= total:
+            body = body_gen(start,step)                   
+            bills = es.search(index="state_bills", body=body)
+            bill_list = bills['hits']['hits']
+            all_bills.append(bill_list)
+
+            start +=  step
+
+        return all_bills
 
 
 ## main function that manages unix interface
@@ -155,7 +177,8 @@ def main():
     args = parser.parse_args()
 
     if args.command == "build_index":
-        create_index(args.data_path)
+        ec = ElasticConnection()
+        ec.create_state_bill_index(args.data_path)
     else:
         print args
 

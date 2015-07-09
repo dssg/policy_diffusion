@@ -60,7 +60,6 @@ for key, value in ids.iteritems():
     try:
         doc = urllib2.urlopen(value['url']).read()
         ids[key]['text'] = parser.from_buffer(doc)['content']
-        ids[key]['doc_type'] = parser.from_buffer(doc)['Content-Type']
     except:
         keys_to_delete.append(key)
 
@@ -99,15 +98,18 @@ for i in ids.keys():
             score, encodeds = aligner.align(aEncoded, bEncoded, backtrace=True)
 
             # Iterate over optimal alignments and print them.
-            for encoded in encodeds:
-                alignment = v.decodeSequenceAlignment(encoded)
-                score = alignment.score
-                if scores[i,j] <= score:
-                    print str((i,j)) + "-score: " + str(score)
-                    scores[i,j] = score
+            print len(encodeds)
+            # for encoded in encodeds:
+            #     alignment = v.decodeSequenceAlignment(encoded)
+            #     score = alignment.score
+            #     # if scores[i,j] <= score:
+            #     #     print str((i,j)) + "-score: " + str(score)
+            #     #     scores[i,j] = score
+            #     print score
+            #     print alignment
+                    # alignments[(i,j)] = alignment 
 
-                    # print alignment
-                    alignments[(i,j)] = alignment 
+
 
                 # print alignment
                 # print 'Alignment score:', alignment.score
