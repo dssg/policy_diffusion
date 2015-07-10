@@ -10,17 +10,11 @@ from alignment.sequencealigner import SimpleScoring, GlobalSequenceAligner, Loca
 #gensim package
 from gensim.models import Word2Vec
 
-#nltk
-# from nltk.tokenize import sent_tokenize
-
-#other
 import numpy as np
 from collections import defaultdict
-
 import urllib2
 from tika import parser
 import nltk
-
 import json
 
 #################
