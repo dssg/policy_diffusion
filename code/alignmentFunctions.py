@@ -181,7 +181,7 @@ def contains(s,q):
 def diff(alignment, gap = '-'):
     a = alignment[1]
     b = alignment[2]
-    length = max(len(alignment[1]), len(alignment[2]))
+    length = min(len(alignment[1]), len(alignment[2]))
 
     diff = []
     for i in range(length):
@@ -347,6 +347,7 @@ def evaluate_algorithm(evals):
     returns:
         matrix with scores between all pairs and a dictionary with information
     '''
+
     scores = np.zeros((max(evals.keys())+1, max(evals.keys())+1))
 
     results = {}
@@ -354,18 +355,30 @@ def evaluate_algorithm(evals):
     for i in evals.keys():
         for j in evals.keys():
             if i < j: #local alignment gives symmetric distance
+                
+                if i + j > 20:
+                    return scores, results
+                
+                if evals[i] == {} or evals[j] == {}:
+                    continue
+
                 text1 = evals[i]['text']
                 text2 = evals[j]['text']
 
-                # Create sequences to be aligned.
-                alignments = align(evals)
+                if text1 == '' or text2 == '':
+                    continue
 
-                scores[i,j] = alignment[0][0]
+                # Create sequences to be aligned.
+                alignments = align(text1, text2)
+
+                scores[i,j] = alignments[0][0]
 
                 results[(i,j)] ={}
                 results[(i,j)]['alignments'] = [(alignment[1], alignment[2]) for alignment in alignments]
 
                 results[(i,j)] = diff(alignment[1], alignment[2])
+
+                print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignments[0][0])
 
     return scores, results
 
@@ -377,6 +390,7 @@ def plot_scores(scores, evals):
 
     for i in evals.keys():
         for j in evals.keys():
+
             if scores[i,j] == 0:
                 #ignore if score zero because url is broken
                 pass
@@ -394,11 +408,14 @@ def plot_scores(scores, evals):
 def main():
     print "loading data"
 
-    bills = json.loads('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/eval.json')
+    with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/eval.json') as file:
+        bills = json.load(file)
+
+    bills = {int(k):v for k,v in bills.iteritems()}
 
     scores, results = evaluate_algorithm(bills)
 
-    plot_scores(scores, evals) 
+    plot_scores(scores, bills) 
 
     #urls to known matches
     # matches = ['http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm'
