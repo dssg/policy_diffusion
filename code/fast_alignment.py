@@ -99,7 +99,8 @@ def computeAlignmentMatrix(left,right,match_score=3,mismatch_score=-1, gap_score
             pointer_matrix[i,j] = max_decision
             score_matrix[i,j] = scores[max_decision]
     
-    return score_matrix,pointer_matrix
+    return score_matrix, pointer_matrix
+
 
 @jit
 def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
@@ -109,6 +110,7 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
         right_alignment
     '''
     i,j = np.unravel_index(score_matrix.argmax(), score_matrix.shape)
+    #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
     decision = pointer_matrix[i,j]
 
     left_alignment = []
@@ -117,39 +119,44 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
         if decision == 1: #do not insert space
             i -= 1
             j -= 1
-            left_alignment.append(left[i])
-            right_alignment.append(right[j])
+            left_alignment = [left[i]] + left_alignment
+            right_alignment = [right[j]] + right_alignment
         elif decision == 2: #insert space in right text
             j -= 1
-            left_alignment.append(left[i])
-            right_alignment.append(gap)
+            right_alignment = [right[j]] + right_alignment
+            left_alignment = [gap] + left_alignment
         elif decision == 3: #insert space in left text
             i -= 1
-            right_alignment.append(right[i])
-            left_alignment.append(gap)
+            left_alignment = [left[i]] + left_alignment
+            right_alignment = [gap] + right_alignment
 
         #update decision
         decision = pointer_matrix[i,j]
 
-        # print 'decision: ' + str(decision)
-        # print 'i: ' + str(i) + ' j: ' + str(j)
-
     return left_alignment, right_alignment
 
 
-def alignment_score(l,r,match_score=3,mismatch_score=-1, gap_score=-2):
+def align(left,right,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-'):
+    s,p=computeAlignmentMatrix(left,right,match_score=3,mismatch_score=-1, gap_score=-2)
+
+    score = s.max()
+
+    l,r = backtrace(left,right,s,p,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-')
+
+    return [(score, l,r)]
+
+
+def alignment_score(l,r,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-'):
     score = 0
     for i in range(len(l)):
         if l[i] == r[i]:
             score += match_score
-        elif l[i] == '-' or r[i] == '-':
+        elif l[i] == gap or r[i] == gap:
             score += gap_score
         else:
             score += mismatch_score
 
     return score
-
-
 
 
 def test_alignment(t1,t2):
@@ -193,11 +200,48 @@ def test_alignment(t1,t2):
     #         print 'index of failure: ' + str(i)
     #         break
 
-t1 = ['a']*100
+if __name__ == '__main__':
+    t1 = ['a']*100
+    t2 = ['b']*50 + ['a','a','b']*50
 
-t2 = ['b']*50 + ['a','a','b']*50
+    s1 = [1]*100
+    s2 = [2]*50 + [1,1,2]*50
 
-s1 = [1]*100
-s2 = [2]*50 + [1,1,2]*50
+    v1 = np.array([0, 1, 2, 3, 4, 7, 6, 3, 2, 1, 3])
+    v2  = np.array([0, 1, 2, 3, 4, 4, 5, 2, 1, 2, 2])
 
-test_alignment(t1,t2)
+    w1 = np.array([7, 6, 3, 2, 1, 3, 0, 1, 2, 3, 4])
+    w2  = np.array([4, 5, 2, 1, 2, 2, 0, 1, 2, 3, 4])
+
+    tests = [(t1,t2), (s1,s2),(v1,v2), (w1,w2), (np.random.choice(5, 30),np.random.choice(5, 30))]
+
+    for test in tests:
+        z1, z2 = test
+
+        test_alignment(z1,z2)
+
+        s,p=computeAlignmentMatrix(z1,z2) #default score is 3,-1,-2
+
+        score = s.max()
+
+        l,r = backtrace(z1,z2,s,p)
+
+        #find score of recovered alignment
+        align_score = alignment_score(l,r)
+
+        #run package algorithm
+        alignments = seqToAlign(z1,z2) #default score is 3,-1,-2
+
+        l_true, r_true = alignments[0][1:]
+
+        for i in range(len(l)):
+            if l[i] != l_true[i]:
+                print 'not same sequence'
+                break
+
+        for i in range(len(r)):
+            if r[i] != r_true[i]:
+                print 'not same sequence'
+                break
+
+
