@@ -102,7 +102,7 @@ def computeAlignmentMatrix(left,right,match_score,mismatch_score, gap_score):
     return score_matrix,pointer_matrix
 
 @jit
-def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
+def backtrace(left, right, score_matrix, pointer_matrix, gap):
     '''
     returns
         left_alignment
@@ -157,7 +157,7 @@ def test_alignment(t1,t2):
 
     score = s.max()
 
-    l,r = backtrace(t1,t2,s,p)
+    l,r = backtrace(t1,t2,s,p,'-')
 
     #find score of recovered alignment
     align_score = alignment_score(l,r,3,-1,-2)
