@@ -75,7 +75,7 @@ class LocalSequenceAligner(SequenceAligner):
 '''
 
 @jit
-def computeAlignmentMatrix(left, right,match_score,mismatch_score, gap_score):
+def computeAlignmentMatrix(left,right,match_score,mismatch_score, gap_score):
     m = len(left) + 1
     n = len(right) + 1
     score_matrix = np.zeros((m, n), int)
