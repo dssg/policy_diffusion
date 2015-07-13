@@ -75,7 +75,7 @@ class LocalSequenceAligner(SequenceAligner):
 '''
 
 @jit
-def computeAlignmentMatrix(left,right,match_score,mismatch_score, gap_score):
+def computeAlignmentMatrix(left,right,match_score=3,mismatch_score=-1, gap_score=-2):
     m = len(left) + 1
     n = len(right) + 1
     score_matrix = np.zeros((m, n), int)
@@ -102,7 +102,7 @@ def computeAlignmentMatrix(left,right,match_score,mismatch_score, gap_score):
     return score_matrix,pointer_matrix
 
 @jit
-def backtrace(left, right, score_matrix, pointer_matrix, gap):
+def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
     '''
     returns
         left_alignment
@@ -121,12 +121,12 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap):
             right_alignment.append(right[j])
         elif decision == 2: #insert space in right text
             j -= 1
-            right_alignment.append(right[i])
-            left_alignment.append(gap)
-        elif decision == 3: #insert space in left text
-            i -= 1
             left_alignment.append(left[i])
             right_alignment.append(gap)
+        elif decision == 3: #insert space in left text
+            i -= 1
+            right_alignment.append(right[i])
+            left_alignment.append(gap)
 
         #update decision
         decision = pointer_matrix[i,j]
@@ -137,7 +137,7 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap):
     return left_alignment, right_alignment
 
 
-def alignment_score(l,r,match_score,mismatch_score, gap_score):
+def alignment_score(l,r,match_score=3,mismatch_score=-1, gap_score=-2):
     score = 0
     for i in range(len(l)):
         if l[i] == r[i]:
@@ -153,17 +153,17 @@ def alignment_score(l,r,match_score,mismatch_score, gap_score):
 
 
 def test_alignment(t1,t2):
-    s,p=computeAlignmentMatrix(t1,t2,3,-1,-2)
+    s,p=computeAlignmentMatrix(t1,t2) #default score is 3,-1,-2
 
     score = s.max()
 
-    l,r = backtrace(t1,t2,s,p,'-')
+    l,r = backtrace(t1,t2,s,p)
 
     #find score of recovered alignment
-    align_score = alignment_score(l,r,3,-1,-2)
+    align_score = alignment_score(l,r)
 
     #run package algorithm
-    alignments = seqToAlign(t1,t2, 3, -1, -2)
+    alignments = seqToAlign(t1,t2) #default score is 3,-1,-2
 
     print 'dp_alg_score: ' + str(score)
     print 'alignment_score: ' + str(align_score)
