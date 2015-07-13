@@ -135,6 +135,42 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
 
     return left_alignment, right_alignment
 
+# @jit
+# def backtrace(left, right, score_matrix, pointer_matrix, gap = 0): #0 represents gap
+#     '''
+#     returns
+#         left_alignment
+#         right_alignment
+#     '''
+#     i,j = np.unravel_index(score_matrix.argmax(), score_matrix.shape)
+#     #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
+#     decision = pointer_matrix[i,j]
+
+#     length = max(len(left),len(right))
+#     left_alignment = np.zeros(length)
+#     right_alignment = np.zeros(length)
+#     k = length - 1
+#     while decision != 0 and i > 0 and j > 0:
+#         if decision == 1: #do not insert space
+#             i -= 1
+#             j -= 1
+#             left_alignment[k] = left[i]
+#             right_alignment[k] = right[j]
+#         elif decision == 2: #insert space in right text
+#             j -= 1
+#             right_alignment[k] = right[j]
+#             left_alignment[k] = gap
+#         elif decision == 3: #insert space in left text
+#             i -= 1
+#             left_alignment[k] = left[i]
+#             right_alignment[k] = gap
+
+#         k -= 1
+
+#         #update decision
+#         decision = pointer_matrix[i,j]
+
+#     return left_alignment[k:], right_alignment[k:]
 
 def align(left,right,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-'):
     s,p=computeAlignmentMatrix(left,right,match_score=3,mismatch_score=-1, gap_score=-2)
