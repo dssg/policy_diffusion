@@ -3,6 +3,7 @@ import numpy as np
 from numba import jit
 from alignmentFunctions import seqToAlign
 import itertools
+<<<<<<< Updated upstream
 import time
 import matplotlib.pyplot as plt
 import sys
@@ -29,6 +30,7 @@ def convert_text_to_ints(a,b):
     b_ints = np.array([word_map[w] for w in b],dtype = int)
 
     return a_ints,b_ints,word_map
+
 
 
 @jit

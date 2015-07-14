@@ -142,14 +142,15 @@ if __name__ == "__main__":
         #configure logging 
         logging.getLogger('tp').setLevel(logging.ERROR)
         logging.getLogger('requests').setLevel(logging.ERROR)
-        logging.basicConfig(filename=os.environ['POLICY_DIFFUSION'] + '/logs/state_bill_extractor.log', level=logging.DEBUG)
+        logging.basicConfig(filename=os.environ['POLICY_DIFFUSION'] + '/logs/state_bill_extractor.log',
+                level=logging.DEBUG)
         
         bill_files = []
         for dirname, dirnames, filenames in walk(args.data_path):
             for filename in filenames:
                 bill_files.append(os.path.join(dirname, filename))
 
-        outFile = codecs.open("{0}/extracted_bills.json".format(DATA_PATH), 'w')
+        outFile = codecs.open("{0}/extracted_data/extracted_bills.json".format(DATA_PATH), 'w')
         for i, bill_file in enumerate(bill_files):
             bill_json_obj = extract_bill_document(bill_file)
 

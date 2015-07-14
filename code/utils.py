@@ -22,6 +22,7 @@ def fetch_url(url):
 
     #fetch ftp file
     if 'ftp://' in url:
+
         try:
             domain_pattern = re.compile("/[A-Za-z0-9\.]+")
             domain_name = domain_pattern.search(url).group(0)[1:]
