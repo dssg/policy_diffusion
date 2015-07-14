@@ -1,86 +1,43 @@
+from __future__ import division
 import numpy as np
 from numba import jit
 from alignmentFunctions import seqToAlign
+import itertools
+import time
+import matplotlib.pyplot as plt
+import sys
 
-'''
-class LocalSequenceAligner(SequenceAligner):
+#converts text to arrays of ints
+def convert_text_to_ints(a,b):
+    """Converts a list of words into an numpy array of integers used by the alignment algorithm
+    Keyword arguments:
+    t1 -- first text array
+    t2 -- second text array
+    """
 
-    def __init__(self, scoring, gapScore, minScore=None):
-        super(LocalSequenceAligner, self).__init__(scoring, gapScore)
-        self.minScore = minScore
-
-    def computeAlignmentMatrix(self, first, second):
-        m = len(first) + 1
-        n = len(second) + 1
-        f = numpy.zeros((m, n), int)
-        for i in xrange(1, m):
-            for j in xrange(1, n):
-                # Match elements.
-                ab = f[i - 1, j - 1] \
-                    + self.scoring(first[i - 1], second[j - 1])
-
-                # Gap on sequenceA.
-                ga = f[i, j - 1] + self.gapScore
-
-                # Gap on sequenceB.
-                gb = f[i - 1, j] + self.gapScore
-
-                f[i, j] = max(0, max(ab, max(ga, gb)))
-        return f
-
-    def bestScore(self, f):
-        return f.max()
-
-    def backtrace(self, first, second, f):
-        m, n = f.shape
-        alignments = list()
-        alignment = self.emptyAlignment(first, second)
-        if self.minScore is None:
-            minScore = self.bestScore(f)
+    word_map = dict()
+    id = 0
+    for w in itertools.chain(a,b):
+        if w in word_map:
+            continue
         else:
-            minScore = self.minScore
-        for i in xrange(m):
-            for j in xrange(n):
-                if f[i, j] >= minScore:
-                    self.backtraceFrom(first, second, f, i, j,
-                                       alignments, alignment)
-        return alignments
+            word_map[w] = id
+            id +=1
 
-    def backtraceFrom(self, first, second, f, i, j, alignments, alignment):
-        if f[i, j] == 0:
-            alignments.append(alignment.reversed())
-        else:
-            c = f[i, j]
-            p = f[i - 1, j - 1]
-            x = f[i - 1, j]
-            y = f[i, j - 1]
-            a = first[i - 1]
-            b = second[j - 1]
-            if c == p + self.scoring(a, b):
-                alignment.push(a, b, c - p)
-                self.backtraceFrom(first, second, f, i - 1, j - 1,
-                                   alignments, alignment)
-                alignment.pop()
-            else:
-                if c == y + self.gapScore:
-                    alignment.push(alignment.gap, b, c - y)
-                    self.backtraceFrom(first, second, f, i, j - 1,
-                                       alignments, alignment)
-                    alignment.pop()
-                if c == x + self.gapScore:
-                    alignment.push(a, alignment.gap, c - x)
-                    self.backtraceFrom(first, second, f, i - 1, j,
-                                       alignments, alignment)
-                    alignment.pop()
-'''
+    
+    a_ints = np.array([word_map[w] for w in a],dtype = int)
+    b_ints = np.array([word_map[w] for w in b],dtype = int)
+
+    return a_ints,b_ints,word_map
+
 
 @jit
 def computeAlignmentMatrix(left,right,match_score=3,mismatch_score=-1, gap_score=-2):
     m = len(left) + 1
     n = len(right) + 1
-    score_matrix = np.zeros((m, n), int)
-    pointer_matrix = np.zeros((m,n), int)
-    scores = np.zeros((4), int)
+    score_matrix = np.zeros((m, n),dtype =  int)
+    pointer_matrix = np.zeros((m,n),dtype = int)
+    scores = np.zeros((4),dtype = int)
     for i in xrange(1, m):
         for j in xrange(1, n):
             
@@ -173,11 +130,21 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
 #     return left_alignment[k:], right_alignment[k:]
 
 def align(left,right,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-'):
-    s,p=computeAlignmentMatrix(left,right,match_score=3,mismatch_score=-1, gap_score=-2)
+    
+    left,right,word_map = convert_text_to_ints(left,right)
+
+    s,p=computeAlignmentMatrix(left,right,match_score,mismatch_score, gap_score)
 
     score = s.max()
 
-    l,r = backtrace(left,right,s,p,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-')
+    l,r = backtrace(left,right,s,p, gap = '-')
+
+
+    reverse_word_map = {v:k for k,v in word_map.items()}
+    reverse_word_map["-"] = "-" 
+    l = [reverse_word_map[w] for w in l]
+    r = [reverse_word_map[w] for w in r]
+
 
     return [(score, l,r)]
 
@@ -212,7 +179,6 @@ def test_alignment(t1,t2):
     print 'alignment_score: ' + str(align_score)
     print 'package_score: ' + str(alignments[0][0])
 
-
     # l_true, r_true = alignments[0][1:]
 
     # if len(l) != len(l_true) or len(r) != len(r_true):
@@ -236,7 +202,8 @@ def test_alignment(t1,t2):
     #         print 'index of failure: ' + str(i)
     #         break
 
-if __name__ == '__main__':
+
+def unit_tests():
     t1 = ['a']*100
     t2 = ['b']*50 + ['a','a','b']*50
 
@@ -281,3 +248,41 @@ if __name__ == '__main__':
                 break
 
 
+def speed_test():
+
+    v1 = np.random.randint(0,10,200)
+    v2 = np.random.randint(0,10,200)
+    
+    input_sizes = [np.exp2(p) for p in range(2,11)]
+
+    average_our_times = []
+    average_package_times = []
+    for input_size in input_sizes:
+        print input_size
+        v1 = np.random.randint(0,10,input_size)
+        v2 = np.random.randint(0,10,input_size)
+        our_times = []
+        package_times = []
+        for i in range(2):
+            t1 = time.time()
+            align(v1,v2)
+            our_times.append(time.time()-t1)
+            
+            t2 = time.time()
+            seqToAlign(v1,v2)
+            package_times.append(time.time()-t2)
+    
+        average_our_times.append(np.mean(our_times))
+        average_package_times.append(np.mean(package_times))
+    
+    plt.plot(input_sizes,average_package_times)
+    plt.plot(input_sizes,average_our_times)
+    plt.show()
+    
+
+if __name__ == '__main__':
+    print "running unit tests...."
+    unit_tests()
+
+    print "running speed test...."
+    speed_test()
