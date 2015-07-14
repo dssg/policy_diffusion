@@ -55,3 +55,28 @@ def fetch_url(url):
             document = None
 
         return document
+
+#used to find alignments in broader text
+def find_subsequence(s,q):
+    '''
+    is the list s contained in q in order and if it is what are indices
+    '''
+    # largest = 0
+    # start = 0
+    # end = 0
+    for i in range(len(q)):
+        T = True
+        for j in range(len(s)):
+            # if largest < j:
+            #     start = i
+            #     end = i +j
+            #     largest = end - start
+            # print "largest: " + str(largest)
+            # print "j: " + str(j)
+            # print "i: " + str(i)
+            if s[j] != q[i+j]:
+                T = False
+                break
+        if T:
+            return (i, i + j + 1)
+    return (0,0)
