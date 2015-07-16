@@ -3,7 +3,6 @@ import numpy as np
 from numba import jit
 from alignmentFunctions import seqToAlign
 import itertools
-<<<<<<< Updated upstream
 import time
 import matplotlib.pyplot as plt
 import sys
@@ -94,59 +93,19 @@ def backtrace(left, right, score_matrix, pointer_matrix, gap = '-'):
 
     return left_alignment, right_alignment
 
-# @jit
-# def backtrace(left, right, score_matrix, pointer_matrix, gap = 0): #0 represents gap
-#     '''
-#     returns
-#         left_alignment
-#         right_alignment
-#     '''
-#     i,j = np.unravel_index(score_matrix.argmax(), score_matrix.shape)
-#     #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
-#     decision = pointer_matrix[i,j]
-
-#     length = max(len(left),len(right))
-#     left_alignment = np.zeros(length)
-#     right_alignment = np.zeros(length)
-#     k = length - 1
-#     while decision != 0 and i > 0 and j > 0:
-#         if decision == 1: #do not insert space
-#             i -= 1
-#             j -= 1
-#             left_alignment[k] = left[i]
-#             right_alignment[k] = right[j]
-#         elif decision == 2: #insert space in right text
-#             j -= 1
-#             right_alignment[k] = right[j]
-#             left_alignment[k] = gap
-#         elif decision == 3: #insert space in left text
-#             i -= 1
-#             left_alignment[k] = left[i]
-#             right_alignment[k] = gap
-
-#         k -= 1
-
-#         #update decision
-#         decision = pointer_matrix[i,j]
-
-#     return left_alignment[k:], right_alignment[k:]
-
 def align(left,right,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-'):
     
     left,right,word_map = convert_text_to_ints(left,right)
 
     s,p=computeAlignmentMatrix(left,right,match_score,mismatch_score, gap_score)
-
     score = s.max()
 
     l,r = backtrace(left,right,s,p, gap = '-')
-
 
     reverse_word_map = {v:k for k,v in word_map.items()}
     reverse_word_map["-"] = "-" 
     l = [reverse_word_map[w] for w in l]
     r = [reverse_word_map[w] for w in r]
-
 
     return [(score, l,r)]
 
@@ -164,48 +123,27 @@ def alignment_score(l,r,match_score=3,mismatch_score=-1, gap_score=-2, gap = '-'
     return score
 
 
-def test_alignment(t1,t2):
-    s,p=computeAlignmentMatrix(t1,t2) #default score is 3,-1,-2
-
-    score = s.max()
-
-    l,r = backtrace(t1,t2,s,p)
-
-    #find score of recovered alignment
-    align_score = alignment_score(l,r)
-
-    #run package algorithm
-    alignments = seqToAlign(t1,t2) #default score is 3,-1,-2
-
-    print 'dp_alg_score: ' + str(score)
-    print 'alignment_score: ' + str(align_score)
-    print 'package_score: ' + str(alignments[0][0])
-
-    # l_true, r_true = alignments[0][1:]
-
-    # if len(l) != len(l_true) or len(r) != len(r_true):
-    #     print "Not the same alignment"
-    #     print 'length of l: ' + str(len(l))
-    #     print 'length of true l: ' + str(len(l_true))
-    #     print 'length of r: ' + str(len(r))
-    #     print 'length of true r: ' + str(len(r_true))
-
-    # for i in range(len(l)):
-    #     if l[i] != l_true[i]:
-    #         print "Not the same alignment"
-    #         print "left alignment difrence: " + str(l[i]) + ',' + str(l_true[i])
-    #         print '\n'
-    #         break
-
-    # for i in range(len(r)):
-    #     if r[i] != r_true[i]:
-    #         print "Not the same alignment"
-    #         print "right alignment difrence: " + str(r[i]) + ',' + str(r_true[i])
-    #         print 'index of failure: ' + str(i)
-    #         break
-
-
 def unit_tests():
+    
+    def test_alignment(t1,t2):
+        s,p=computeAlignmentMatrix(t1,t2) #default score is 3,-1,-2
+
+        score = s.max()
+
+        l,r = backtrace(t1,t2,s,p)
+
+        #find score of recovered alignment
+        align_score = alignment_score(l,r)
+
+        #run package algorithm
+        alignments = seqToAlign(t1,t2) #default score is 3,-1,-2
+
+        print 'dp_alg_score: ' + str(score)
+        print 'alignment_score: ' + str(align_score)
+        print 'package_score: ' + str(alignments[0][0])
+
+
+
     t1 = ['a']*100
     t2 = ['b']*50 + ['a','a','b']*50
 
