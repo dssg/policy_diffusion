@@ -10,26 +10,11 @@ MODEL_LEGISLATION_INDEX = "model_legistlation"
 #ES_CONNECTION = Elasticsearch(timeout=300)
 ES_CONNECTION = Elasticsearch([{'host': '54.212.36.132', 'port': 9200}],timeout = 300)
 
-class TestToe():
-
-    def __init__(self,toe_type ="big",toe_size = 3):
-        self.toe = toe_type
-        self.toe_size = toe_size
-        print self.toe,self.toe_size
-    
-
 
 class ElasticConnection():
 
     def __init__(self,host = "localhost",port = 9200):
         self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 300)
-
-    # bulk loads all json files in subdirectory
-    def load_bulk_bills(self,bill_directory):
-        ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout = 100)
-        bulk_data = []
-        ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data,timeout=100)
-        return
 
 
     # creates index for bills and model legislation stored in
@@ -75,34 +60,17 @@ class ElasticConnection():
                 bulk_data = []
 
 
+    def query_state_bills(self,query,highlight = False):
+        
+        if highlight:
+            json_query = json.decode("{0}/db/state_bill_query_with_highlights.json".format(
+                os.environ['POLICY_DIFFUSION'])
+        
+        else:
+            json_query = json.decode("{0}/db/state_bill_query_no_highlights.json".format(
+                os.environ['POLICY_DIFFUSION'])
     
-
-    def query_state_bills(self,query):
-        json_query = {
-                "query": {
-                    "bool": {
-                        "should": {
-                            "match": {
-                                "bill_document_last.shingles": query
-                                }
-                            }
-                        }
-                    },
-                "highlight": {
-                    "pre_tags": [
-                        "<mark>"
-                        ],
-                    "post_tags": [
-                        "</mark>"
-                        ],
-                    "fields": {
-                        "bill_document_last.shingles": {
-                            "number_of_fragments": 0
-                            }
-                        }
-                    }
-                }
-
+        json_query['query']['match']['bill_document_last.shingles'] = query       
         results = ES_CONNECTION.search(index = STATE_BILL_INDEX,body = json_query)
         results = results['hits']['hits']
         result_docs = []
@@ -121,9 +89,9 @@ class ElasticConnection():
 
     def get_all_bills(self, step = 3000):
         es = self.es_connection
-
+        # fix with .format: '{"from" :{0}, "size" :{1}'.format(start,size)
         body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) + ', "query":{"bool":{"must":{"match_all":{}}}}} '
-
+        
         body = body_gen(0,0)
         bills = es.search(index="state_bills", body=body)
 
@@ -150,7 +118,8 @@ class ElasticConnection():
             total = bills['hits']['total']
         else:
             total = num_bills
-
+        
+        #fix as above
         body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) +  ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
 
 

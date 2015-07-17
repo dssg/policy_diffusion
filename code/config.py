@@ -1,5 +1,5 @@
 
 
 #Global path variables
+DATA_PATH = "/mnt/elasticsearch/dssg"
 
-DATA_PATH = "/mnt/data/sunlight"

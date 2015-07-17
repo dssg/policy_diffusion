@@ -38,7 +38,7 @@ def scrape_all_bills(bill_data_path, num_workers):
     random.shuffle(bill_file_paths)
 
     pool = multiprocessing.Pool(num_workers)
-
+    
     print "fetch {0} urls from sunlight...".format(len(bill_file_paths))
     pool.map(scrape_bill_document_from_sunlight, bill_file_paths)
 
@@ -52,10 +52,10 @@ def scrape_bill_document_from_sunlight(file_path):
         file_path = file_path.strip()
 
         #define path to write file
-        out_file_path = "/".join(file_path.split("/")[6:])
+        out_file_path = file_path.split("/bills")[-1]
         out_file_path = re.sub("\s+", "_", out_file_path)
         out_dir_root_path = "{0}/scraped_bills".format(DATA_PATH)
-        out_file_name = "{0}/{1}.json".format(out_dir_root_path, out_file_path)
+        out_file_name = "{0}{1}.json".format(out_dir_root_path, out_file_path)
 
         bill_json = json.loads(codecs.open(file_path, encoding="utf8").read())
 
@@ -176,14 +176,13 @@ def scrape_ALEC_model_legislation():
             Jsonbill = bill_source_to_json(url, source, date)
             f.write("{0}\n".format(Jsonbill))
 
-    # MATT: can we change this so it reads from /data and writes to /data
     # Save old alec bills (from Center for the Media and Democracy)
-    names = os.listdir('{0}/dssg/model_legislation/ALEC_exposed'.format(DATA_PATH))
+    names = os.listdir('{0}/model_legislation/ALEC_exposed'.format(DATA_PATH))
     with open('alec_old_bills.json', 'w') as f2:
         for name in names:
             source2 = open(name, 'rb').read()
             url2 = None
-            date2 = 2010 - 2013
+            date2 = "2010 - 2013"
             Jsonbill2 = utils.bill_source_to_json(url2, source2, date2)
             f2.write("{0}\n".format(Jsonbill2))
 
@@ -198,20 +197,17 @@ def scrape_CSG_model_legislation():
     for link in bs.find_all('a'):
         if link.has_attr('href'):
             candidate = link.attrs['href']
-            if candidate[-4:] == ".pdf":  # links with pdf extension tend to be model bills
+            # links with pdf extension tend to be model bills
+            if candidate[-4:] == ".pdf":  
                 aliceLinks.append(candidate)
 
-                # only keeps distinct links
+    # only keeps distinct links
     aliceLinks = list(set(aliceLinks))
 
     badCount = 0
     goodCount = 0
     with open('alice_bills.json', 'w') as f:
         for link in aliceLinks:
-            # url_key = {}
-            # source = urllib2.urlopen(link).read()
-            # Jsonbill = bill_source_to_json(link, source, None)
-            # f.write("{0}\n".format(Jsonbill))
             try:
                 url_key = {}
                 source = urllib2.urlopen(link).read()
@@ -275,7 +271,8 @@ def scrape_ALICE_legislation():
 
 def scrape_misc_legislation():
         # Access list of clean urls
-    with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/model_legislation_urls/clean_urls.txt','r') as f:
+    with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/model_legislation_urls/clean_urls.txt',
+            'r') as f:
         links = f.read().splitlines()
 
     badCount = 0

@@ -195,7 +195,6 @@ def split_to_sections(cleantext,state):
         print state
     return chunked_list
 
-#No data for 'ct'
 #Delete empty sections (run before deleting numbers in lines)
 def delete_empty_sections(chunked_list):
     '''
