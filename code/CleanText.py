@@ -76,91 +76,148 @@ def isNewSection(s):
 ##########################
 #Main clean function
 
-def clean_text(text, bill_name, lower = 1):
+def clean_text(text, lower = 1):
     '''
-    text:
+    variables:
         text: string corresponding to text of bill
-        bill_name: string corresponding to name of the bill
+        bill_name: string corresponding to bill_id
 
     returns:
-        tuple with one field that is string that is cleaned up text 
-        and the other field is a dictionary corresponding to sections
+        string that is cleaned up text 
     decription:
-        clean text and return dictionary with sections
-        note that the dictionary of sections only contains material after 
-        the first section
+        clean text 
     '''
     #parse by line
-    text_list = string.split(text,'\n')
+    text_list =  text.splitlines()
 
+    #make text lowercase
     if lower == 1:
         text_list = [text.lower() for text in text_list]
 
-    #replace funky symbols 
-    for i in range(len(text_list)):
-        text_list[i] = text_list[i].replace(u'\xa0', u' ')
+    #replace funky symbols and multipe new lines
+    ntext_list = []
+    for line in text_list:
+        line = line.replace(u'\xa0', u' ')
+        line = line.replace(u'>>', u' ')
+        line = line.replace(u'\xa7', u' ')
+        line = line.replace(u'\xe2', u' ')
+        line = line.replace(u'\u201c', u' ')
+        line = line.replace(u'\u201d', u' ')
+        line = line.replace(u'\xbb', u' ')
+        line = line.replace(u'\xa9', u' ')
+        line = line.replace(u'{ font-family: courier, arial, sans-serif; font-size: 10pt; } table { empty-cells:show; }', u' ')
+        line = re.sub( '\s+', ' ', line)
+        ntext_list.append(line)
+    return (string.join(ntext_list, '\n'))
+ 
+ 
 
-    keep =[]
-    prev_newline = 0
-    for i in range(len(text_list)):
-        line = text_list[i]
-        if isLong(line,50) or isInt(line):
-            continue
-        if prev_newline == 1 and isSpace(line):
-            continue
-        elif prev_newline == 0 and isSpace(line):
-              prev_newline = 1
-              keep.append(line)
-        else:
-            if isHeaderFooter(line, bill_name):
-                continue
-            else:
-                keep.append(line)
-                prev_newline = 0
+#Get data from elasticsearch to test
+es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
 
+def test_clean_text(state):
+   match = es.search(index="state_bills", body={"query": {"match": {'state': 'ca'}}})
+   state_text = match['hits']['hits'][4]['_source']['bill_document_first']
+   cleantext = clean_text(state_text)
+   return cleantext
+   
 
-    sections = defaultdict(list)
-    seen_section = 0 #have we seen a section yet
-    for line in keep:
-        if isNewSection(line):
-            seen_section = 1
-            section = line
-            sections[section].append(line)
-        elif seen_section == 0:
-            continue
-        else:
-            sections[section].append(line)
+def split_to_sections(cleantext,state):
+    '''
+    variables:
+        cleantext: clean version of text of bill
+        state: abbreviation of state ID
 
-    return (string.join(keep, '\n'), sections)
+    returns:
+        list of bill sections
+    decription:
+        splits bill text into sections
+    '''
+    if state == 'ak':
+        chunked_list = cleantext.split("\n*")
+    elif state in ('al','ar','mt','or','ri'):
+        chunked_list = cleantext.split('\nsection')
+    elif state in ('nm','tx'):
+        chunked_list = cleantext.split('\n section')
+    elif state in ('az','ia','nv'):
+        chunked_list = cleantext.split('\nsec.')
+    elif state in ('me', 'mi'):
+        chunked_list = cleantext.split('\n sec.')
+    elif state == 'co':
+        chunked_list = re.split('[[0-9][0-9]\.section|[0-9]\.section', cleantext)
+    elif state in ('de','fl','tn'):
+        chunked_list = re.split('section\s[0-9][0-9]\.|section\s[0-9]\.', cleantext)
+    elif state == 'ga':
+        cleantext = re.sub('[0-9][0-9]\\n|[0-9]\\n', ' ', cleantext)
+        chunked_list = re.split('\\nsection\s[0-9][0-9]|\\nsection\s[0-9]', cleantext)
+    elif state in ('hi','sd','in'):
+        chunked_list = re.split('\\n\ssection\s[0-9][0-9]\.|\\n\ssection\s[0-9]', cleantext)
+    elif state == 'pa':
+        chunked_list = re.split('section\s[0-9][0-9]\.|section\s[0-9]\.', cleantext) 
+    elif state in ('id', 'la', 'md', 'nd'):
+        chunked_list = re.split('\\nsection\s[0-9][0-9]\.|\\nsection\s[0-9]\.', cleantext)
+    elif state == 'il':
+        cleantext = re.sub('\\n\s[0-9][0-9]|\\n\s[0-9]', ' ', cleantext)
+        chunked_list = re.split('\\n\s\ssection\s', cleantext)
+    elif state == 'sc':
+        chunked_list = cleantext.split('\n \n')
+    elif state == 'ks':
+        chunked_list = re.split('\\nsection\s|sec\.', cleantext)
+    elif state in ('ne', 'mn'):
+        chunked_list = re.split('\ssection\s[0-9]\.|\ssec.\s[0-9][0-9]\.|\ssec.\s[0-9]\.', cleantext)
+    elif state == 'ky':
+        chunked_list = cleantext.split('\n\n\n section .')
+    elif state == 'ms':
+        chunked_list = cleantext.split('\n\n\n section ')
+    elif state in ('ma', 'nc', 'oh','ut'):
+        chunked_list = re.split('\ssection\s[0-9][0-9]\.|\ssection\s[0-9]\.', cleantext)
+    elif state == 'mo':
+        chunked_list = re.split('\\n\s[0-9][0-9]\.\s|\\n\s[0-9]\.\s', cleantext)
+    elif state == 'nh':
+        chunked_list = re.split('\n\n[0-9][0-9]\s|\n\n[0-9]\s', cleantext)
+    elif state == 'nj':
+        chunked_list = re.split('\\n\\n\s[0-9][0-9]\.\s|\\n\\n\s[0-9]\.\s', cleantext)
+    elif state == 'ny':
+        chunked_list = re.split('\ssection\s[0-9]\.|\.\ss\s[0-9]\.', cleantext)
+    elif state == 'ok':
+        chunked_list = re.split('\nsection\s\.\s', cleantext)
+    elif state == 'va':
+        chunked_list = re.split('(([A-Z])|[0-9][0-9])\.\s|(([A-Z])|[0-9])\.\s', cleantext)
+    elif state == 'wi':
+        chunked_list = re.split('\\n[0-9][0-9]section\s\\n|\\n[0-9]section\s\\n', cleantext)
+    elif state == 'wv':
+        chunked_list = re.split('\n\s\([a-z]\)\s', cleantext)
+    elif state == 'wy':
+        chunked_list = re.split('\ssection\s[0-9][0-9]\.|\ssection\s[0-9]\.', cleantext)
+    elif state == 'ca':
+        chunked_list = re.split('section\s[0-9]\.|sec.\s[0-9][0-9]\.|sec.\s[0-9]\.', cleantext)
+    else:
+        print state
+    return chunked_list
 
+#No data for 'ct'
+#Delete empty sections (run before deleting numbers in lines)
+def delete_empty_sections(chunked_list):
+    '''
+    decription: deletes empty elements in bills
+    '''
+    return [x for x in chunked_list if x is not None and len(x)>2] 
 
+#Need to delete number lines for: OR, OK, NE, PA (run before deleting lines) 
+def delete_numbers_in_lines (chunked_list):
+    '''
+    decription:
+        cleans pdf extractor errors where number of lines were included in text
+    '''
+    for i in range(0, len(chunked_list)):
+        chunked_list[i] = re.sub('\\n\s[0-9][0-9]|\\n[0-9][0-9]|\\n[0-9]|\\n\s[0-9]', '', chunked_list[i])   
 
-def main():
-    es = ElasticConnection(host = "54.212.36.132")
-
-    bills = es.query_state_bills('test')
-
-    for bill in bills:
-        bill_name = bill['title']
-        (cleaned, sections) = clean_text(bill['doc_text'], bill_name)
-
-        print 'original text: ' + '\n'
-        pprint(bill['doc_text'])
-        print '\n'
-        print 'cleaned text: ' + '\n'
-        pprint(cleaned)
-        print '\n'
-        print 'sections: ' + '\n'
-        pprint(sections)
-        # print '\n'
-        # print 'list: ' + '\n'  
-        # pprint(nltk.word_tokenize(cleaned))
-        # pprint(cleaned.split())
-        raw_input("Press Enter to continue...")
-
-
-if __name__ == '__main__':
-    main()
-
+#Delete multiple new lines for each section
+def delete_lines (chunked_list):
+    '''
+    description: deletes multiple lines and spaces for each section
+    '''
+    for i in range(0, len(chunked_list)):
+        chunked_list[i] = re.sub( '\s+', ' ', chunked_list[i])
 
 
