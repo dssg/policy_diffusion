@@ -155,7 +155,8 @@ def delete_lines (chunked_list):
     '''
     description: deletes multiple lines and spaces for each section
     '''
-    for i in range(0, len(chunked_list)):
-        chunked_list[i] = re.sub( '\s+', ' ', chunked_list[i])
+    chunked_list = [re.sub( '\s+', ' ', x) for x in chunked_list]
+    return chunked_list
+        
 
 
