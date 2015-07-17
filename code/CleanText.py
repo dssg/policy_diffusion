@@ -15,67 +15,6 @@ import nltk
 #custom modules
 from database import ElasticConnection
 
-##########################
-#Predicate Functions for Cleaning
-def isInt(s):
-    '''
-    Tests whether n can be turned into an integer
-
-    '''
-    try:
-        int(s)
-        return True
-    except:
-        return False
-
-def isHeaderFooter(s,bill_name):
-    '''
-    Tests whether s is a header or a footer of the following form:
-    bill_name + page_number
-    '''
-    if re.match(bill_name + ' \d', s) == None:
-        return False
-    else:
-        return True
-
-def isLong(s, n):
-    '''
-    if a string s contains a word longer than n, it returns True
-    '''
-    words = s.split()
-    for word in words:
-        if len(word) >= n:
-            return True
-    return False
-
-# def isTabs(s):
-#     '''
-#     checks if line consists only in tabs
-#     '''
-#     if re.search(r'\t+',s) != None:
-#         return True
-#     else:
-#         return False
-
-def isSpace(s):
-    '''
-    checks if string consists only of spaces
-    '''
-    return s.split() == []
-
-
-def isNewSection(s):
-    '''
-    Determines whether s is a new section.
-    '''
-    if re.match(r'^section \d', s) != None:
-        return True
-    else:
-        return False
-
-##########################
-#Main clean function
-
 def clean_text(text, lower = 1):
     '''
     variables:
@@ -116,8 +55,8 @@ def clean_text(text, lower = 1):
 es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
 
 def test_clean_text(state):
-   match = es.search(index="state_bills", body={"query": {"match": {'state': 'ca'}}})
-   state_text = match['hits']['hits'][4]['_source']['bill_document_first']
+   match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
+   state_text = match['hits']['hits'][0]['_source']['bill_document_first']
    cleantext = clean_text(state_text)
    return cleantext
    
