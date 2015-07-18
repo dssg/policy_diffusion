@@ -1,0 +1,20 @@
+{
+  "query": {
+    "match": {
+      "bill_document_last.shingles": "enter_query_here"
+    }
+  },
+  "highlight": {
+    "pre_tags": [
+      "<mark>"
+    ],
+    "post_tags": [
+      "</mark>"
+    ],
+    "fields": {
+      "bill_document_last.shingles": {
+        "number_of_fragments": 0
+      }
+    }
+  }
+}

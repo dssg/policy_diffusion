@@ -64,8 +64,6 @@ def text_after_line_numbers(lines):
     return '\n'.join(text).decode('utf-8', 'ignore')
 
 
-
-
 def plaintext(abbr, doc, doc_bytes):
     # use module to pull text out of the bytes
     module = importlib.import_module(abbr)
