@@ -147,8 +147,11 @@ def delete_numbers_in_lines (chunked_list):
     decription:
         cleans pdf extractor errors where number of lines were included in text
     '''
-    for i in range(0, len(chunked_list)):
-        chunked_list[i] = re.sub('\\n\s[0-9][0-9]|\\n[0-9][0-9]|\\n[0-9]|\\n\s[0-9]', '', chunked_list[i])   
+
+    re_string = '\\n\s[0-9][0-9]|\\n[0-9][0-9]|\\n[0-9]|\\n\s[0-9]'
+    chunked_list = [re.sub(re_string,'',t) for t in chunked_list]
+    return chunked_list
+
 
 #Delete multiple new lines for each section
 def delete_lines (chunked_list):
@@ -158,5 +161,17 @@ def delete_lines (chunked_list):
     chunked_list = [re.sub( '\s+', ' ', x) for x in chunked_list]
     return chunked_list
         
+
+def clean_text_for_query(bill_text,state):
+    bill_text = clean_text(bill_text)
+    bill_text_sections = split_to_sections(bill_text,state)
+    bill_text_sections = delete_empty_sections(bill_text_sections)
+
+    if state in ['or','ok','ne','pa']:
+        bill_text_sections = delete_numbers_in_lines(bill_text_sections)
+    
+    bill_text_sections = delete_lines(bill_text_sections)
+    return " ".join(bill_text_sections)
+
 
 
