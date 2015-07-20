@@ -6,6 +6,9 @@ from ftplib import FTP, error_perm
 import re
 from StringIO import StringIO
 import time
+import multiprocessing
+
+
 
 #creates a searalized json object for bill sources
 def bill_source_to_json(url,source,date):
@@ -15,7 +18,6 @@ def bill_source_to_json(url,source,date):
     jsonObj['source'] = base64.b64encode(source)
 
     return ujson.encode(jsonObj)
-
 
 #wrapper for urllib2.urlopen that catches URLERROR and socket error
 def fetch_url(url):
