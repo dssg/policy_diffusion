@@ -5,15 +5,19 @@ alignment object oriented
 from __future__ import division
 import numpy as np
 from numba import jit
-from alignmentFunctions import seqToAlign
 import itertools
 import time
 import matplotlib.pyplot as plt
 import sys
 import abc
 import json
-# import io
 import pickle
+from tika import parser
+import urllib2
+
+from alignmentFunctions import seqToAlign
+from CleanText import clean_text
+
 
 class Alignment():
 
@@ -147,7 +151,7 @@ class LocalAlignment(Alignment):
 
         return left_alignment, right_alignment
 
-    def alignment_score(self, l,r,match_score=3,mismatch_score=-1, gap_score=-2):
+    def alignment_score(self, l, r,match_score=3, mismatch_score=-1, gap_score=-2):
         score = 0
         for i in range(len(l)):
             if l[i] == r[i]:
@@ -163,7 +167,7 @@ class LocalAlignment(Alignment):
 class AffineLocalAlignment(Alignment):
 
     # @jit
-    def align(self, match_score=3,mismatch_score=-1, gap_start=-2, gap_extend = -.5):
+    def align(self, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
         left = self.left_text
         right = self.right_text
 
@@ -463,17 +467,18 @@ def grid_search(bills, match_scores = [3,4], mismatch_scores = [-1,-2], gap_scor
     grid_performance = {}
     for match_score, mismatch_score, gap_score in zip(match_scores, mismatch_scores, gap_scores):
 
+        print 'running model: match_score {0} mismatch_score {1} gap_score {2}'.format(match_score, mismatch_score, gap_score)
+
         grid_performance[(match_score, mismatch_score, gap_score)] = {}
         scores, results = evaluate_algorithm(bills, match_score, mismatch_score, gap_score)
         grid_performance[(match_score, mismatch_score, gap_score)]['results'] = results
         grid_performance[(match_score, mismatch_score, gap_score)]['scores'] = scores
 
+    return grid_performance
+
 
 def evaluate():
-    with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/eval.json') as file:
-        bills = json.load(file)
-
-    bills = {int(k):v for k,v in bills.iteritems()}
+    bills = load_bills()
 
     scores, results = evaluate_algorithm(bills)
 
@@ -482,6 +487,33 @@ def evaluate():
     return scores, results
 
 
+def inspect_alignments(results, match_type = 0, start_score = 'max'):
+        '''
+            match_type is 0 if you want to inspect non-matches
+            and 1 if you want to inspect matches
+        '''
+        alignments = [tuple([value['score']] + list(value['alignments'][0]))  for key, value in results.items() if value['match'] == match_type]
+        sorted_alignments = sorted(alignments, key=lambda tup: tup[0], reverse = True)
+
+        if start_score == 'max':
+            for score, a1, a2 in sorted_alignments:
+                for i in range(len(a1)):
+                    #note a1 and a2 must have same length
+                    print a1[i], a2[i]
+                print 'score: ', score
+                raw_input("Press Enter to continue...")
+        else:
+            for score, a1, a2 in sorted_alignments:
+                if score > start_score:
+                    pass
+                else:
+                    for i in range(len(a1)):
+                        print a1[i], a2[i]
+                    print 'score: ', score
+                    raw_input("Press Enter to continue...")
+
+############################################################
+##alignments utils
 def diff(alignment):
     a = alignment[1]
     b = alignment[2]
@@ -520,11 +552,10 @@ def cleanAlignment(alignment):
 ############################################################
 ##Alignment Feature Generation and Plotting
 
-'''
-These functions take as input two alignments and produce features of these
-'''
-
 def alignment_features(left, right):
+    '''
+    This function takes as input two alignments and produce features of these
+    '''
     #alignment features
     features = {}
     features['length'] = len(left)
@@ -639,6 +670,44 @@ def calc_pop_results(results):
 
     return results
 
+def low_rank_plot(results):
+    '''
+    Convert dictionary to matrix
+    '''
+    matches = [[value for key, value in values['features'].items()] \
+        for keys, values in results.items() if values['match'] == 1]
+
+    non_matches = [[value for key, value in values['features'].items()] \
+        for keys, values in results.items() if values['match'] == 0]
+
+    #matches from 0 to match_index
+    match_index = len(matches)
+
+    data = np.array(matches + non_matches)
+
+    # U, l, V = np.linalg.svd(data, full_matrices=False)
+    # L = np.diag(l)
+    # L[2:,2:] = 0 #zero out values
+    # low_rank = np.dot(U, np.dot(L, V))
+    
+    # #distinguish matches and non-matches
+    # m = low_rank[:match_index, :]
+    # n = low_rank[match_index:, :]
+
+    sklearn_pca = sklearnPCA(n_components=2)
+    sklearn_transf = sklearn_pca.fit_transform(data)
+
+    #plot data
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    plt.plot(sklearn_transf[:match_index,0],sklearn_transf[:match_index,1], 
+             'o', markersize=7, color='blue', alpha=0.5, label='matches')
+    plt.plot(sklearn_transf[match_index:,0], sklearn_transf[match_index:,1], 
+             '^', markersize=7, color='red', alpha=0.5, label='non-matches')
+
+    plt.legend(loc='upper left');
+    plt.show()
+
 
 def plot_alignment_stats(results):
     matches = [value['features'] for key, value in results.items() if value['match'] == 1]
@@ -665,34 +734,7 @@ def plot_alignment_stats(results):
         plt.show()
 
 
-
-def inspect_alignments(results, match_type = 0, start_score = 'max'):
-        '''
-            match_type is 0 if you want to inspect non-matches
-            and 1 if you want to inspect matches
-        '''
-        alignments = [tuple([value['score']] + list(value['alignments'][0]))  for key, value in results.items() if value['match'] == match_type]
-        sorted_alignments = sorted(alignments, key=lambda tup: tup[0], reverse = True)
-
-        if start_score == 'max':
-            for score, a1, a2 in sorted_alignments:
-                for i in range(len(a1)):
-                    #note a1 and a2 must have same length
-                    print a1[i], a2[i]
-                print 'score: ', score
-                raw_input("Press Enter to continue...")
-        else:
-            for score, a1, a2 in sorted_alignments:
-                if score > start_score:
-                    pass
-                else:
-                    for i in range(len(a1)):
-                        print a1[i], a2[i]
-                    print 'score: ', score
-                    raw_input("Press Enter to continue...")
-
-
-#data saving and loading
+#data creating, saving, and loading
 def create_bills(ls):
     '''
     args:
@@ -704,6 +746,7 @@ def create_bills(ls):
     k = 0
     bill_id = 0
     bills = {}
+    bad_count = 0
     for urls in ls:
         for url in urls:
             try:
@@ -711,14 +754,17 @@ def create_bills(ls):
                 bills[bill_id] = {}
                 doc = urllib2.urlopen(url).read()
                 text = parser.from_buffer(doc)['content']
+                cleaned_text = clean_text(text)
 
-                print text
+                print cleaned_text
                 
                 bills[bill_id]['url'] = url
-                bills[bill_id]['text'] = text
+                bills[bill_id]['text'] = cleaned_text
                 bills[bill_id]['match'] = k
             except:
                 pass
+                bad_count += 1
+                print 'bad_count: ', bad_count
             bill_id += 1
         k += 1
 
@@ -797,13 +843,14 @@ similar_bills = [['http://www.azleg.gov/legtext/52leg/1r/bills/hb2505p.pdf',
     'http://www.legis.nd.gov/cencode/t12-1c20.pdf?20150708171557']
     ]
 
-
+def create_save_bills(bill_list):
+    bills = create_bills(bill_list)
+    with open('../data/bills.json', 'wb') as fp:
+        pickle.dump(bills, fp)
 
 def load_bills():
-    with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/bills.json') as file:
-        bills = json.load(file)
-
-    bills = {int(k):v for k,v in bills.iteritems()}
+    with open('../data/bills.json','rb') as fp:
+        bills =pickle.load(fp)
 
     return bills
 
@@ -825,6 +872,7 @@ def load_results():
     with open('../data/results.json','rb') as fp:
         data =pickle.load(fp)
     return data
+
 
 
 if __name__ == '__main__':
