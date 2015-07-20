@@ -3,12 +3,23 @@ import os
 import argparse
 from elasticsearch import Elasticsearch
 import json
+import time
+import base64
+from config import DATA_PATH
+import utils
+from multiprocessing import Pool
+import re
+import itertools
+from tika import parser as tp
+import numpy as np
+import logging
+import elasticsearch
+
+logging.getLogger('elasticsearch').setLevel(logging.ERROR)
 
 #Constants
 STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legistlation"
-#ES_CONNECTION = Elasticsearch(timeout=300)
-ES_CONNECTION = Elasticsearch([{'host': '54.212.36.132', 'port': 9200}],timeout = 300)
 
 
 class ElasticConnection():
@@ -20,19 +31,19 @@ class ElasticConnection():
     # creates index for bills and model legislation stored in
     # data_path, overwriting index if it is already created
     def create_state_bill_index(self,data_path):
-        if ES_CONNECTION.indices.exists(STATE_BILL_INDEX):
+        if self.es_connection.indices.exists(STATE_BILL_INDEX):
             print("deleting '%s' index..." % (STATE_BILL_INDEX))
-            ES_CONNECTION.indices.delete(index=STATE_BILL_INDEX)
+            self.es_connection.indices.delete(index=STATE_BILL_INDEX)
 
 
         mapping_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/state_bill_mapping.json").read())
         settings_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/state_bill_index.json").read())
 
         print("creating '%s' index..." % (STATE_BILL_INDEX))
-        res = ES_CONNECTION.indices.create(index=STATE_BILL_INDEX, body=settings_doc,timeout=30)
+        res = self.es_connection.indices.create(index=STATE_BILL_INDEX, body=settings_doc,timeout=30)
 
         print("adding mapping for bill_documents")
-        res = ES_CONNECTION.indices.put_mapping(index=STATE_BILL_INDEX, doc_type="bill_document",
+        res = self.es_connection.indices.put_mapping(index=STATE_BILL_INDEX, doc_type="bill_document",
                                                 body=mapping_doc)
 
         bulk_data = []
@@ -54,39 +65,108 @@ class ElasticConnection():
             bulk_data.append(json_obj)
             if len(bulk_data) == 1000:
                 print i
-                ES_CONNECTION.bulk(index=STATE_BILL_INDEX, body=bulk_data, timeout=300)
+                self.es_connection.bulk(index=STATE_BILL_INDEX, body=bulk_data, timeout=300)
 
                 del bulk_data
                 bulk_data = []
+    
+    
+    def get_all_doc_ids(self,index):
+        count = self.es_connection.count(index)['count']
+        q = {"query":{"match_all" :{} },"fields":[]} 
+        results = self.es_connection.search(index = index,body = q,size = count)
+        doc_ids = [res['_id'] for res in results['hits']['hits']]
+        
+        return doc_ids
+        
 
-
-    def query_state_bills(self,query,highlight = False):
+    def query_state_bills_for_frontend(self,query,highlight = False):
         
         if highlight:
-            json_query = json.decode("{0}/db/state_bill_query_with_highlights.json".format(
-                os.environ['POLICY_DIFFUSION'])
+            json_query = json.load(open("{0}/db/state_bill_query_with_highlights.json".format(
+                os.environ['POLICY_DIFFUSION'])))
+            json_query = json.load(open("{0}/db/state_bill_query_no_highlights.json".format(
+                os.environ['POLICY_DIFFUSION'])))
+            json_query['query']['match']['bill_document_last.shingles'] = query
+            results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query)
+            results = results['hits']['hits']
+            result_docs = []
+            for res in results:
+                doc = {}
+                doc['doc_text_with_highlights'] = res['highlight']['bill_document_last.shingles']
+                doc['doc_text'] = res['_source']['bill_document_last']
+                doc['score'] = res['_score']
+                doc['bill_id'] = res['_source']['unique_id']
+                doc['state'] = res['_source']['state']
+                doc['title'] = res['_source']['bill_title']
+                
+                result_docs.append(doc)
+
+            return result_docs
+
         
         else:
-            json_query = json.decode("{0}/db/state_bill_query_no_highlights.json".format(
-                os.environ['POLICY_DIFFUSION'])
+            json_query = json.load(open("{0}/db/state_bill_query_no_highlights.json".format(
+                os.environ['POLICY_DIFFUSION'])))
+            json_query['query']['match']['bill_document_last.shingles'] = query
+            results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query)
+            results = results['hits']['hits']
+            result_docs = []
+            for res in results:
+                doc = {}
+                doc['doc_text'] = res['_source']['bill_document_last']
+                doc['score'] = res['_score']
+                doc['bill_id'] = res['_source']['unique_id']
+                doc['state'] = res['_source']['state']
+                doc['title'] = res['_source']['bill_title']
+                
+                result_docs.append(doc)
+
+            return result_docs
+
     
-        json_query['query']['match']['bill_document_last.shingles'] = query       
-        results = ES_CONNECTION.search(index = STATE_BILL_INDEX,body = json_query)
+
+    def similar_doc_query(self,query,num_results = 1000):
+        json_query = """ 
+            {
+                "query": {
+                    "more_like_this": {
+                        "fields": [
+                            "bill_document_last.shingles"
+                        ],
+                        "like_text": "",
+                        "max_query_terms": 25,
+                        "min_term_freq": 1,
+                        "min_doc_freq": 2,
+                        "minimum_should_match": 1
+                    }
+                }
+            }
+        """
+        json_query = json.loads(json_query)
+        json_query['query']['more_like_this']['like_text'] = query            
+        results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
+                fields = ["state"],
+                size = num_results )
         results = results['hits']['hits']
         result_docs = []
         for res in results:
             doc = {}
-            doc['doc_text_with_highlights'] = res['highlight']['bill_document_last.shingles']
-            doc['doc_text'] = res['_source']['bill_document_last']
+            doc['state'] = res["fields"]['state']
             doc['score'] = res['_score']
-            doc['bill_id'] = res['_source']['unique_id']
-            doc['state'] = res['_source']['state']
-            doc['title'] = res['_source']['bill_title']
+            doc['id'] = res['_id']
             
             result_docs.append(doc)
 
         return result_docs
 
+
+    def get_bill_by_id(self,id):
+        query_body = {"query":{"match":{"unique_id":id}}}
+        match = self.es_connection.search(index = "state_bills",body = query_body)
+        return match['hits']['hits'][0]['_source']
+
+        
     def get_all_bills(self, step = 3000):
         es = self.es_connection
         # fix with .format: '{"from" :{0}, "size" :{1}'.format(start,size)
@@ -109,6 +189,9 @@ class ElasticConnection():
             start +=  step
 
         return all_bills
+
+
+
 
     def get_bills_by_state(self, state, num_bills = 'all', step = 3000):
         es = self.es_connection
@@ -137,6 +220,71 @@ class ElasticConnection():
         return all_bills
 
 
+
+def parallel_query(query):
+    ec = ElasticConnection()
+    result = ec.similar_doc_query(query)
+    return result
+
+
+#test to see how query time is affected by speed
+def query_time_speed_test():
+    from tika import parser as tp
+    import re
+    import numpy as np
+
+    alec_bills = [json.loads(x) for x in open("{0}/model_legislation/alec_bills.json".format(DATA_PATH))]
+    test_queries = [base64.b64decode(s['source']) for s in alec_bills]
+    pattern = re.compile("[0-9]\.\s.*") 
+    for i,t in enumerate(test_queries):
+        test_queries[i] = tp.from_buffer(t)['content']
+        test_queries[i] = " ".join(re.findall(pattern,test_queries[i]))
+        test_queries[i] = test_queries[i].split()
+    
+    test_queries = [x for x in test_queries if len(x) >= 1500]
+    query_sizes =  np.arange(50,1050,50)
+    ec = ElasticConnection()
+    avg_times = []
+    for query_size in query_sizes:
+        temp_times = []
+        for query in test_queries:
+            query = " ".join(query[0:query_size])
+            t1 = time.time()
+            ec.similar_doc_query(query,num_results = 1000)
+            temp_times.append(time.time()-t1)
+        
+        avg_times.append(np.mean(temp_times))
+        print "query size {0} , avg time (s) {1}".format(query_size,np.mean(temp_times))
+
+    for i in avg_times:
+        print i
+
+
+def parallel_requests_test():
+    alec_bills = [json.loads(x) for x in open("{0}/model_legislation/alec_bills.json".format(DATA_PATH))]
+    test_queries = [base64.b64decode(s['source']) for s in alec_bills]
+    pattern = re.compile("[0-9]\.\s.*") 
+    for i,t in enumerate(test_queries):
+        test_queries[i] = tp.from_buffer(t)['content']
+        test_queries[i] = " ".join(re.findall(pattern,test_queries[i]))
+        #test_queries[i] = test_queries[i].split()
+        #test_queries[i] = " ".join(test_queries[i][0:200])
+    
+    test_queries = test_queries[0:100]
+    ec = ElasticConnection()
+    serial_time = time.time()
+    for test_query in test_queries:
+        ec.similar_doc_query(test_query)
+
+    print "serial time:  ",time.time()-serial_time
+    pool = Pool(processes=7)
+    parallel_time = time.time()
+    pool.map(parallel_query,test_queries)
+    print "parallel time:  ",time.time()-parallel_time
+    exit()
+
+
+
 ## main function that manages unix interface
 def main():
     parser = argparse.ArgumentParser(description='Process some integers.')
@@ -148,6 +296,19 @@ def main():
     if args.command == "build_index":
         ec = ElasticConnection()
         ec.create_state_bill_index(args.data_path)
+    elif args.command == "speed_test":
+        parallel_requests_test()
+        query_time_speed_test()
+    
+    elif args.command == "test_query":
+        ec = ElasticConnection(host = "54.203.12.145",port = "9200")
+        ids = ec.get_all_doc_ids("state_bills")
+        id_file = open("{0}/data/bill_ids.txt".format(os.environ['POLICY_DIFFUSION']),'w')
+        for id in ids:
+            id_file.write("{0}\n".format(id))
+        
+        id_file.close()    
+
     else:
         print args
 
