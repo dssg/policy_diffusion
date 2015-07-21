@@ -55,8 +55,8 @@ def clean_text(text, lower = 1):
 es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
 
 def test_clean_text(state):
-   match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
-   state_text = match['hits']['hits'][0]['_source']['bill_document_first']
+   match = es.search(index="state_bills", body={"query": {"match": {'state': 'wa'}}})
+   state_text = match['hits']['hits'][3]['_source']['bill_document_first']
    cleantext = clean_text(state_text)
    return cleantext
    
@@ -78,7 +78,7 @@ def split_to_sections(cleantext,state):
         chunked_list = cleantext.split('\nsection')
     elif state in ('nm','tx'):
         chunked_list = cleantext.split('\n section')
-    elif state in ('az','ia','nv'):
+    elif state in ('az','ia','nv', 'wa'):
         chunked_list = cleantext.split('\nsec.')
     elif state in ('me', 'mi'):
         chunked_list = cleantext.split('\n sec.')
@@ -131,7 +131,8 @@ def split_to_sections(cleantext,state):
     elif state == 'ca':
         chunked_list = re.split('section\s[0-9]\.|sec.\s[0-9][0-9]\.|sec.\s[0-9]\.', cleantext)
     else:
-        print state
+        return None
+
     return chunked_list
 
 #Delete empty sections (run before deleting numbers in lines)
