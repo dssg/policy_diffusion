@@ -1,5 +1,5 @@
 '''
-alignment object oriented
+module that contains Alignment class and sub classes of
 '''
 
 from __future__ import division
@@ -16,11 +16,6 @@ from tika import parser
 import urllib2
 import re
 import pandas as pd
-# import seaborn as sns
-
-# from alignmentFunctions import seqToAlign
-# from CleanText import clean_text
-
 
 class Alignment():
 
@@ -33,10 +28,10 @@ class Alignment():
     def _transform_text(self,a,b):
         """Converts a list of words into an numpy array of integers used by the alignment algorithm
         Keyword arguments:
-        t1 -- first text array
-        t2 -- second text array
+        a -- array of strings
+        b -- array of strings
         """
-
+        
         word_map = dict()
         id = 0
         for w in itertools.chain(a,b):
@@ -45,11 +40,9 @@ class Alignment():
             else:
                 word_map[w] = id
                 id +=1
-
         
         a_ints = np.array([word_map[w] for w in a],dtype = int)
         b_ints = np.array([word_map[w] for w in b],dtype = int)
-
         return a_ints, b_ints, word_map
 
     @abc.abstractmethod
@@ -69,14 +62,6 @@ class LocalAlignment(Alignment):
         score = score_matrix.max()
 
         reverse_word_map = {v:k for k,v in word_map.items()}
-
-        # print 'left_true_array: ', a_ints
-        # print "word_map: ", word_map
-        # print "reverse_word_map: ", reverse_word_map
-        # print "left array: ", l
-        # print "------------------------------------------------------"
-
-
         reverse_word_map["-"] = "-" 
         l = [reverse_word_map[w] for w in l]
         r = [reverse_word_map[w] for w in r]
