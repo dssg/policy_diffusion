@@ -79,7 +79,6 @@ class LocalAlignment(Alignment):
         for i in xrange(1, m):
             for j in xrange(1, n):
                 
-                
                 if left[i-1] == right[j-1]:
                     scores[1] = score_matrix[i-1,j-1] + match_score
                 else:
