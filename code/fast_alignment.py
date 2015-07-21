@@ -14,9 +14,12 @@ import json
 import pickle
 from tika import parser
 import urllib2
+import re
+import pandas as pd
+# import seaborn as sns
 
-from alignmentFunctions import seqToAlign
-from CleanText import clean_text
+# from alignmentFunctions import seqToAlign
+# from CleanText import clean_text
 
 
 class Alignment():
@@ -85,9 +88,9 @@ class LocalAlignment(Alignment):
 
         m = len(left) + 1
         n = len(right) + 1
-        score_matrix = np.zeros((m, n),dtype =  int)
+        score_matrix = np.zeros((m, n),dtype =  float)
+        scores = np.zeros((4),dtype = float)
         pointer_matrix = np.zeros((m,n),dtype = int)
-        scores = np.zeros((4),dtype = int)
         for i in xrange(1, m):
             for j in xrange(1, n):
                 
@@ -426,7 +429,7 @@ def evaluate_algorithm(bills, match_score = 3, mismatch_score = -1, gap_score = 
     return scores, results
 
 
-def plot_scores(results, bills):
+def plot_scores(scores, bills):
 
     matchScores = []
     nonMatchScores = []
@@ -441,12 +444,6 @@ def plot_scores(results, bills):
                 matchScores.append(min(scores[i,j],200))
             else:
                 nonMatchScores.append(min(scores[i,j],200))
-
-    # val = 0. 
-    # plt.plot(matchScores, np.zeros_like(matchScores), 'o')
-    # plt.plot(nonMatchScores, np.zeros_like(nonMatchScores), 'x')
-    # plt.plot()
-    # plt.show()
 
     bins = np.linspace(min(nonMatchScores + matchScores), max(nonMatchScores + matchScores), 100)
     plt.hist(nonMatchScores, bins, alpha=0.5, label='Non-Matches')
@@ -463,19 +460,60 @@ def plot_scores(results, bills):
     fig.show()
 
 
-def grid_search(bills, match_scores = [3,4], mismatch_scores = [-1,-2], gap_scores = [-1,-2]):
+def grid_search(bills, match_scores = [2,3,4,5], mismatch_scores = [-1,-2,-3,-4,-5], gap_scores = [-1,-2,-3,-4,-5]):
     grid_performance = {}
-    for match_score, mismatch_score, gap_score in zip(match_scores, mismatch_scores, gap_scores):
+    for match_score in match_scores:
+        for mismatch_score in mismatch_scores:
+            for gap_score in gap_scores:
 
-        print 'running model: match_score {0} mismatch_score {1} gap_score {2}'.format(match_score, mismatch_score, gap_score)
+                print 'running model: match_score {0} mismatch_score {1} gap_score {2}'.format(match_score, mismatch_score, gap_score)
 
-        grid_performance[(match_score, mismatch_score, gap_score)] = {}
-        scores, results = evaluate_algorithm(bills, match_score, mismatch_score, gap_score)
-        grid_performance[(match_score, mismatch_score, gap_score)]['results'] = results
-        grid_performance[(match_score, mismatch_score, gap_score)]['scores'] = scores
+                grid_performance[(match_score, mismatch_score, gap_score)] = {}
+                scores, results = evaluate_algorithm(bills, match_score, mismatch_score, gap_score)
+                grid_performance[(match_score, mismatch_score, gap_score)]['results'] = results
+                grid_performance[(match_score, mismatch_score, gap_score)]['scores'] = scores
 
     return grid_performance
 
+def grid_to_df(grid):
+    t = []
+    for key1, value1 in grid.items():
+        for key2, value2 in value1['results'].items():
+            t.append(list(key1) + [key2, value2['score'], value2['match']])
+    
+    df = pd.DataFrame(t)
+    df.columns = ['match_score', 'mismatch_score', 'gap_score', 'pair', 'score', 'match']
+
+    return df
+
+def plot_grid(df):
+
+    #make maximum possible 500
+    df.loc[df['score']>500,'score'] = 500
+
+    #match plot
+    df_match = df[(df['mismatch_score'] == -2) & (df['gap_score'] == -1)]
+
+    g = sns.FacetGrid(df_match, col="match_score")
+    g = g.map(sns.boxplot, "match", "score")
+    sns.plt.ylim(0,400)
+    sns.plt.show()
+
+    #mismatch plot
+    df_mismatch = df[(df['match_score'] == 3) & (df['gap_score'] == -1)]
+
+    g = sns.FacetGrid(df_mismatch, col="mismatch_score")
+    g = g.map(sns.boxplot, "match", "score")
+    sns.plt.ylim(0,400)
+    sns.plt.show()
+
+    #gap plot
+    df_gap = df[(df['match_score'] == 3) & (df['mismatch_score'] == -2)]
+
+    g = sns.FacetGrid(df_gap, col="gap_score")
+    g = g.map(sns.boxplot, "match", "score")
+    sns.plt.ylim(0,400)
+    sns.plt.show()
 
 def evaluate():
     bills = load_bills()
@@ -685,15 +723,6 @@ def low_rank_plot(results):
 
     data = np.array(matches + non_matches)
 
-    # U, l, V = np.linalg.svd(data, full_matrices=False)
-    # L = np.diag(l)
-    # L[2:,2:] = 0 #zero out values
-    # low_rank = np.dot(U, np.dot(L, V))
-    
-    # #distinguish matches and non-matches
-    # m = low_rank[:match_index, :]
-    # n = low_rank[match_index:, :]
-
     sklearn_pca = sklearnPCA(n_components=2)
     sklearn_transf = sklearn_pca.fit_transform(data)
 
@@ -704,7 +733,8 @@ def low_rank_plot(results):
              'o', markersize=7, color='blue', alpha=0.5, label='matches')
     plt.plot(sklearn_transf[match_index:,0], sklearn_transf[match_index:,1], 
              '^', markersize=7, color='red', alpha=0.5, label='non-matches')
-
+    plt.xlim([-50,1000])
+    plt.ylim([-500,500])
     plt.legend(loc='upper left');
     plt.show()
 
@@ -729,6 +759,7 @@ def plot_alignment_stats(results):
         fig = plt.figure(1, figsize=(9, 6))
         ax = fig.add_subplot(111)
         bp = ax.boxplot(data_to_plot)
+        plt.ylim([0,50])
         ax.set_xticklabels(['Matches', 'Non-Matches'])
         plt.title(field)
         plt.show()
@@ -754,7 +785,20 @@ def create_bills(ls):
                 bills[bill_id] = {}
                 doc = urllib2.urlopen(url).read()
                 text = parser.from_buffer(doc)['content']
+
+                #clean up text
                 cleaned_text = clean_text(text)
+                cleaned_text_list = cleaned_text.split('\n')
+
+                #delete lines with just number
+                re_string = '\\n\s[0-9][0-9]|\\n[0-9][0-9]|\\n[0-9]|\\n\s[0-9]'
+                cleaned_text_list = [re.sub(re_string,'',t) for t in cleaned_text_list]
+
+                #delete empty lines
+                cleaned_text_list = [re.sub( '\s+', ' ', x) for x in cleaned_text_list]
+                cleaned_text_list = [x for x in cleaned_text_list if x is not None and len(x)>2]
+
+                cleaned_text = ' '.join(cleaned_text_list)
 
                 print cleaned_text
                 
@@ -855,7 +899,7 @@ def load_bills():
     return bills
 
 def load_scores():
-    scores = np.load('eval_alignments.npy')
+    scores = np.load('../data/scores.npy')
 
     return scores
 
@@ -873,14 +917,22 @@ def load_results():
         data =pickle.load(fp)
     return data
 
-
-
 if __name__ == '__main__':
     print "running unit tests...."
     unit_tests()
 
     print "running speed test...."
     speed_test()
+
+
+with open('clean_eval_bills.json') as data_file:    
+    clean_bills = json.load(data_file)
+
+clean_bills = {int(key) : value for key, value in clean_bills.items()}
+
+
+
+
 
 
 
