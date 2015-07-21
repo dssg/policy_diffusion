@@ -909,10 +909,7 @@ if __name__ == '__main__':
     speed_test()
 
 
-with open('clean_eval_bills.json') as data_file:    
-    clean_bills = json.load(data_file)
 
-clean_bills = {int(key) : value for key, value in clean_bills.items()}
 
 
 
