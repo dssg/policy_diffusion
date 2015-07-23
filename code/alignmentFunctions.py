@@ -103,10 +103,7 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
     alignments = [v.decodeSequenceAlignment(encoded) for encoded in encodeds]
 
     return [(a.score, list(a.first), list(a.second)) for a in alignments]
-    # if return_tup == 1:
-    #     return [(a.score, a.first, a.second) for a in alignments]
-    # else:
-    #     return Alignment(score, alignments)
+
 
 def seqToSeqSyn(words, syn):
     '''
