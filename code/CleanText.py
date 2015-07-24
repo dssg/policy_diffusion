@@ -55,7 +55,7 @@ def clean_text(text, lower = 1):
 es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
 
 def test_clean_text(state):
-   match = es.search(index="state_bills", body={"query": {"match": {'state': 'wa'}}})
+   match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
    state_text = match['hits']['hits'][3]['_source']['bill_document_first']
    cleantext = clean_text(state_text)
    return cleantext
@@ -175,4 +175,22 @@ def clean_text_for_query(bill_text,state):
     return " ".join(bill_text_sections)
 
 
+def clean_text_for_alignment(bill_text,state):
+    bill_text = clean_text(bill_text)
+    bill_text_sections = split_to_sections(bill_text,state)
+    bill_text_sections = delete_empty_sections(bill_text_sections)
 
+    if state in ['or','ok','ne','pa']:
+        bill_text_sections = delete_numbers_in_lines(bill_text_sections)
+    
+    bill_text_sections = delete_lines(bill_text_sections)
+
+    return bill_text_sections
+
+def test_clean_text_for_alignment(state):
+    match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
+    state_text = match['hits']['hits'][3]['_source']['bill_document_first']
+
+    return clean_text_for_alignment(state_text, state)
+
+#good example is test_clean_text_for_alignment('va')
