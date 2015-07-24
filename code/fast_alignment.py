@@ -16,6 +16,8 @@ from tika import parser
 import urllib2
 import re
 import pandas as pd
+import random
+from compiler.ast import flatten
 from sklearn.decomposition import PCA
 from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
@@ -62,14 +64,15 @@ class LocalAlignment(Alignment):
 
         a_ints, b_ints, word_map = self._transform_text(left, right)
         score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, match_score, mismatch_score, gap_score)
-        l, r = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
-
-        score = score_matrix.max()
+        l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
         reverse_word_map = {v:k for k,v in word_map.items()}
         reverse_word_map["-"] = "-" 
         l = [reverse_word_map[w] for w in l]
         r = [reverse_word_map[w] for w in r]
+
+        self.alignment_indices.append(align_index)
+        self.alignments.append((score, l, r))
 
         return [(score, l,r)]
 
@@ -109,9 +112,8 @@ class LocalAlignment(Alignment):
 
         #store start of alignment index
         align_index = {}
-        self.alignment_indices.append(align_index)
-        self.alignment_indices[-1]['end_1'] = i
-        self.alignment_indices[-1]['end_2'] = j
+        align_index['left_end'] = i
+        align_index['right_end'] = j
 
         #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
         decision = pointer_matrix[i,j]
@@ -136,12 +138,12 @@ class LocalAlignment(Alignment):
             #update decision
             decision = pointer_matrix[i,j]
 
-        self.alignment_indices[-1]['start_1'] = i
-        self.alignment_indices[-1]['start_2'] = j
+        align_index['left_start'] = i
+        align_index['right_start'] = j
 
-        self.alignments.append((score, left_alignment, right_alignment))
+        # self.alignments.append((score, left_alignment, right_alignment))
 
-        return left_alignment, right_alignment
+        return left_alignment, right_alignment, score, align_index
 
     def alignment_score(self, l, r,match_score=3, mismatch_score=-1, gap_score=-2):
         score = 0
@@ -273,6 +275,57 @@ class AffineLocalAlignment(Alignment):
 
         return score
 
+class SectionLocalAlignment(LocalAlignment):
+
+    def __init__(self, left_text, right_text):
+        self.left_text = left_text
+        #compare left sections to right document
+        self.right_text = flatten(right_text)
+        self.alignments = []
+        self.alignment_indices = []
+
+    '''
+    Input:
+        List of lists where each list is a list of words in a section in the document 
+
+    Description:
+        Local Alignment that looks for alignments by section
+    '''
+    def align(self, match_score=3, mismatch_score=-1, gap_score=-2):
+        
+        right = self.right_text
+
+        #keeps track of beginning index of section
+        #to recover correct indices of sections
+        section_start_index = 0
+
+        for left in self.left_text:
+
+            a_ints, b_ints, word_map = self._transform_text(left, right)
+            score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, match_score, mismatch_score, gap_score)
+            l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
+
+            score = score_matrix.max()
+
+            reverse_word_map = {v:k for k,v in word_map.items()}
+            reverse_word_map["-"] = "-" 
+            l = [reverse_word_map[w] for w in l]
+            r = [reverse_word_map[w] for w in r]
+
+            self.alignments.append((score, l, r))
+
+            #adjust for section
+            align_index['left_start'] += section_start_index
+            align_index['right_start'] += section_start_index
+
+            self.alignment_indices.append(align_index)
+
+            #update section_start_index
+            section_start_index += len(left)
+
+        return self.alignments
+
+
 
 ############################################################
 ##testing functions
@@ -306,7 +359,27 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
 
     return [(a.score, list(a.first), list(a.second)) for a in alignments]
 
+#testing functions
+def create_test_cases():
+    #tests
+    t1 = ['a']*100
+    t2 = ['b']*50 + ['a','a','b']*50
 
+    s1 = [1]*100
+    s2 = [2]*50 + [1,1,2]*50
+
+    v1 = np.array([0, 1, 2, 3, 4, 7, 6, 3, 2, 1, 3])
+    v2  = np.array([0, 1, 2, 3, 4, 4, 5, 2, 1, 2, 2])
+
+    w1 = np.array([7, 6, 3, 2, 1, 3, 0, 1, 2, 3, 4])
+    w2  = np.array([4, 5, 2, 1, 2, 2, 0, 1, 2, 3, 4])
+
+    tests = [(t1,t2), (s1,s2),(v1,v2), (w1,w2), (np.random.choice(5, 30),np.random.choice(5, 30))]
+
+    return tests
+
+
+#LocalAlignment algorithm tests
 def unit_tests():
     
     def test_alignment(t1,t2):
@@ -328,19 +401,7 @@ def unit_tests():
             print 'package_score: ' + str(alignments[0][0])
 
     #tests
-    t1 = ['a']*100
-    t2 = ['b']*50 + ['a','a','b']*50
-
-    s1 = [1]*100
-    s2 = [2]*50 + [1,1,2]*50
-
-    v1 = np.array([0, 1, 2, 3, 4, 7, 6, 3, 2, 1, 3])
-    v2  = np.array([0, 1, 2, 3, 4, 4, 5, 2, 1, 2, 2])
-
-    w1 = np.array([7, 6, 3, 2, 1, 3, 0, 1, 2, 3, 4])
-    w2  = np.array([4, 5, 2, 1, 2, 2, 0, 1, 2, 3, 4])
-
-    tests = [(t1,t2), (s1,s2),(v1,v2), (w1,w2), (np.random.choice(5, 30),np.random.choice(5, 30))]
+    tests = create_test_cases()
     for test in tests:
         z1, z2 = test
         test_alignment(z1,z2)
@@ -370,11 +431,7 @@ def unit_tests():
                 print 'not same sequence'
                 break
 
-
 def speed_test():
-
-    v1 = np.random.randint(0,10,200)
-    v2 = np.random.randint(0,10,200)
     
     input_sizes = [np.exp2(p) for p in range(2,7)]
 
@@ -399,24 +456,103 @@ def speed_test():
         average_our_times.append(np.mean(our_times))
         average_package_times.append(np.mean(package_times))
     
-    plt.plot(input_sizes,average_package_times, color = 'b')
-    plt.plot(input_sizes,average_our_times, color='r')
+    plt.plot(input_sizes,average_package_times, color = 'b', label = 'package')
+    plt.plot(input_sizes,average_our_times, color='r', label = 'our implementation')
+    plt.legend(loc='upper right')
+    plt.xlabel('input size')
     plt.ylim(0,0.02)
     plt.show()
 
 
-def load_results():
-    with open('../data/results.json','rb') as fp:
-        data =pickle.load(fp)
-    return data
+#SectionLocalAlignment Tests
+def create_section_tests():
+    tests = create_test_cases()
+
+    #convert tests into sections so 
+    #that it makes sense for case
+    left_test = []
+    right_test = []
+    for test1, test2 in tests:
+        left_test.append(list(test1))
+        right_test.append(list(test2))
+
+    return left_test, right_test
+
+
+def section_unit_tests():
+    left_test, right_test = create_section_tests()
+
+    f = SectionLocalAlignment(left_test,right_test)
+    f.align()
+
+    good_job = True
+    for score, left, right in f.alignments:
+        true_score = f.alignment_score(left, right)
+        if true_score != score:
+            print 'true alignment score: ', true_score
+            print 'calculated score: ', score
+            good_job = False
+            break
+
+    if good_job:
+        print "calculated alignment scores correctly"
+
+
+def section_speed_test():
+
+    input_sizes = [np.exp2(p) for p in range(2,9)]
+
+    average_local_times = []
+    average_section_times = []
+    for input_size in input_sizes:
+        print input_size
+        v1 = list(np.random.randint(0,10,input_size))
+        v2 = list(np.random.randint(0,10,input_size))
+
+        cut1 = random.randint(0,len(v1))
+        cut2 = random.randint(cut1,len(v2))
+        cut3 = random.randint(cut2,len(v2))
+        w1 = [v1[:cut1], v1[cut1:cut2], v1[cut2:cut3], v1[cut3:]]
+
+        local_times = []
+        section_times = []
+        for i in range(2):
+            t1 = time.time()
+            f = LocalAlignment(v1,v2)
+            f.align()
+            local_times.append(time.time()-t1)
+
+            t2 = time.time()
+            f = SectionLocalAlignment(w1,v2)
+            f.align()
+            section_times.append(time.time()-t2)
+    
+        average_local_times.append(np.mean(local_times))
+        average_section_times.append(np.mean(section_times))
+    
+    plt.plot(input_sizes,average_section_times, color = 'b', label = 'section local alignment')
+    plt.plot(input_sizes,average_local_times, color='r', label = 'local alignment')
+    plt.legend(loc='upper right')
+    plt.xlabel('input size')
+    plt.ylim(0,0.02)
+    plt.show()
+
+
+def test_alignment_index():
+
 
 if __name__ == '__main__':
-    print "running unit tests...."
-    unit_tests()
+    # print "running unit tests...."
+    # unit_tests()
 
-    print "running speed test...."
-    speed_test()
+    # print "running speed test...."
+    # speed_test()
 
+    print "running section_unit_tests"
+    section_unit_tests()
+
+    print "running section_speed_test"
+    section_speed_test()
 
 
 
