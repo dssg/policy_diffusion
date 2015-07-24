@@ -539,7 +539,9 @@ def section_speed_test():
 
 
 def test_alignment_index():
+    left_test, right_test = create_section_tests()
 
+    
 
 if __name__ == '__main__':
     # print "running unit tests...."
