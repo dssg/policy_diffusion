@@ -204,26 +204,6 @@ def diff(alignment):
     return diff
 
 
-def cleanAlignment(alignment):
-    '''
-    arg:
-        alignment object
-    returns:
-        2 list of alignment words without the alignment symbol
-    '''
-    keep1 = []
-    keep2 = []
-    for item in alignment[1]:
-        if item != '-':
-            keep1.append(item)
-
-    for item in alignment[2]:
-        if item != '-':
-            keep2.append(item)
-
-    return (keep1, keep2)
-
-
 ############################################################
 ##Alignment Feature Generation and Plotting
 
@@ -480,6 +460,12 @@ def load_scores():
 def save_results(results):
     with open('../data/results.json','wb') as fp:
         pickle.dump(results, fp)
+
+
+def load_results():
+    with open('../data/results.json','rb') as fp:
+        data =pickle.load(fp)
+    return data
 
 
 if __name__ == '__main__':
