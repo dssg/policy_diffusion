@@ -22,6 +22,7 @@ from sklearn.decomposition import PCA
 from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
 from alignment.sequencealigner import SimpleScoring, GlobalSequenceAligner, LocalSequenceAligner
+from utils import find_subsequence
 
 
 class Alignment():
@@ -538,10 +539,52 @@ def section_speed_test():
     plt.show()
 
 
-def test_alignment_index():
+def test_alignment_indices():
     left_test, right_test = create_section_tests()
 
-    
+    f = SectionLocalAlignment(left_test, right_test)
+
+    good_job = True
+    for i in range(len(f.alignments)):
+        left, right = clean_alignment(f.alignments[i])
+
+        left_start, left_end = find_subsequence(left, left_test)
+        right_start, right_end = find_subsequence(right, right_test)
+
+        if f.alignment_indices['left_start'] != left_start or \
+            f.alignment_indices['left_end'] != left_end or \
+            f.alignment_indices['right_start'] != right_start or \
+            f.alignment_indices['right_end'] != right_end:
+            
+            print 'indices are messed up'
+            good_job = False
+            break
+
+    if good_job:
+        print 'indices worked'
+
+############################################################
+##helper functions
+def clean_alignment(alignment):
+    '''
+    arg:
+        alignment object
+    returns:
+        2 list of alignment words without the alignment symbol
+    '''
+    keep1 = []
+    keep2 = []
+    for item in alignment[1]:
+        if item != '-':
+            keep1.append(item)
+
+    for item in alignment[2]:
+        if item != '-':
+            keep2.append(item)
+
+    return (keep1, keep2)
+
+
 
 if __name__ == '__main__':
     # print "running unit tests...."
@@ -555,6 +598,9 @@ if __name__ == '__main__':
 
     print "running section_speed_test"
     section_speed_test()
+
+    print 'running test_alignment_indices'
+    test_alignment_indices()
 
 
 
