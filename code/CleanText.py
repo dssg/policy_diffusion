@@ -130,6 +130,8 @@ def split_to_sections(cleantext,state):
         chunked_list = re.split('\ssection\s[0-9][0-9]\.|\ssection\s[0-9]\.', cleantext)
     elif state == 'ca':
         chunked_list = re.split('section\s[0-9]\.|sec.\s[0-9][0-9]\.|sec.\s[0-9]\.', cleantext)
+    elif state == None:
+        chunked_list = cleantext.split("\n")
     else:
         return None
 
