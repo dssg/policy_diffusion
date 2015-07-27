@@ -25,11 +25,11 @@ class Experiment():
 	def __init__(self, bills, algorithm):
 		self.bills = bills
 		self.algorithm = algorithm
-		self.scores = None
-		self.results = None
+		self.scores = np.zeros((max(self.bills.keys())+1, max(self.bills.keys())+1))
+		self.results = {}
 
 
-	def plot_scores():
+	def plot_scores(self):
 
 	    matchScores = []
 	    nonMatchScores = []
@@ -62,7 +62,7 @@ class Experiment():
 	    ax.set_xticklabels(['Match Scores', 'Non-Match Scores'])
 	    fig.show()
 
-	def evaluate():
+	def evaluate(self):
 	    self.evaluate_algorithm(bills)
 
 	    self.plot_scores(scores, bills) 
@@ -71,16 +71,16 @@ class Experiment():
 
 
     @abc.abstractmethod
-    def evaluate_algorithm():
+    def evaluate_algorithm(self):
     	pass
 
 
     @abc.abstractmethod
-    def clean_bills():
+    def clean_bills(self):
     	pass
 
     #alignment feature methods
-    def alignment_features(left, right):
+    def alignment_features(self,left, right):
         '''
         This function takes as input two alignments and produce features of these
         '''
@@ -150,13 +150,13 @@ class Experiment():
 
 
     @abc.abstractmethod
-    def calc_pop_results(results):
+    def calc_pop_results(self, results):
         pass
 
 
     ############################################################
     ##alignments utils
-    def _diff(alignment):
+    def _diff(self, alignment):
         a = alignment[1]
         b = alignment[2]
         length = min(len(alignment[1]), len(alignment[2]))
@@ -169,3 +169,88 @@ class Experiment():
                 diff.append((a[i], b[i]))
 
         return diff
+
+
+class DocExperiment(Experiment):
+
+    def evaluate_algorithm(self, bills, match_score = 3, mismatch_score = -1, gap_score = -2):
+        '''
+        args:
+            matches: dictionary with field corresponding to text and match groups
+
+        returns:
+            matrix with scores between all pairs and a dictionary with information
+        '''
+        for i in self.bills.keys():
+            for j in self.bills.keys():
+                if i < j: #local alignment gives symmetric distance on document comparison
+                    
+                    if bills[i] == {} or bills[j] == {}:
+                        continue
+
+                    text1 = bills[i]['text'].split()
+                    text2 = bills[j]['text'].split()
+
+                    if text1 == '' or text2 == '':
+                        continue
+
+                    # Create sequences to be aligned.
+                    f = self.algorithm(text1, text2)
+                    f.align(match_score, mismatch_score, gap_score)
+
+                    scores[i,j] = alignments[0][0]
+
+                    results[(i,j)] ={}
+                    results[(i,j)]['alignments'] = f.alignments
+                    results[(i,j)]['score'] = f.alignments[0][0]
+                    results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
+
+                    results[(i,j)]['diff'] = [diff(alignment) for alignment in f.alignments]
+
+                    print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignments[0][0])
+
+        return scores, results
+
+
+
+class SectionExperiment(Experiment):
+
+    def evaluate_algorithm(self, bills, match_score = 3, mismatch_score = -1, gap_score = -2):
+    '''
+    args:
+        matches: dictionary with field corresponding to text and match groups
+
+    returns:
+        matrix with scores between all pairs and a dictionary with information
+    '''
+    for i in self.bills.keys():
+        for j in self.bills.keys():                
+
+            if bills[i] == {} or bills[j] == {}:
+                continue
+
+            text1 = bills[i]['text']
+            text2 = bills[j]['text']
+
+            if text1 == '' or text2 == '':
+                continue
+
+            # Create sequences to be aligned.
+            f = self.algorithm(text1, text2)
+            f.align(match_score, mismatch_score, gap_score)
+
+            scores[i,j] = alignments[0][0]
+
+            results[(i,j)] ={}
+            results[(i,j)]['alignments'] = f.alignments
+            results[(i,j)]['score'] = f.alignments[0][0]
+            results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
+
+            results[(i,j)]['diff'] = [diff(alignment) for alignment in f.alignments]
+
+            print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignments[0][0])
+
+    return scores, results
+
+
+
