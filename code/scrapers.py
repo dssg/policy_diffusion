@@ -193,21 +193,21 @@ def scrape_CSG_model_legislation():
     doc = urllib2.urlopen(url).read()
     bs = BeautifulSoup(doc)
 
-    aliceLinks = []
+    links = []
     for link in bs.find_all('a'):
         if link.has_attr('href'):
             candidate = link.attrs['href']
             # links with pdf extension tend to be model bills
             if candidate[-4:] == ".pdf":  
-                aliceLinks.append(candidate)
+                links.append(candidate)
 
     # only keeps distinct links
-    aliceLinks = list(set(aliceLinks))
+    inks = list(set(links))
 
     badCount = 0
     goodCount = 0
     with open('alice_bills.json', 'w') as f:
-        for link in aliceLinks:
+        for link in links:
             try:
                 url_key = {}
                 source = urllib2.urlopen(link).read()
@@ -222,7 +222,7 @@ def scrape_CSG_model_legislation():
 
 
 def scrape_ALICE_legislation():
-    path = "/Users/jkatzsamuels/Desktop/dssg/sunlight/test_code/csg_files/links_"
+    path = "/mnt/data/sunlight/dssg/model_legislation/links_"
     lines = []
     for i in [1, 2, 3]:
         filePath = path + str(i) + ".txt"
@@ -271,7 +271,7 @@ def scrape_ALICE_legislation():
 
 def scrape_misc_legislation():
         # Access list of clean urls
-    with open('/Users/jkatzsamuels/Desktop/dssg/sunlight/policy_diffusion/data/model_legislation_urls/clean_urls.txt',
+    with open('/mnt/data/sunlight/dssg/model_legislation/clean_urls.txt',
             'r') as f:
         links = f.read().splitlines()
 
