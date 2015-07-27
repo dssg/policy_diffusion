@@ -190,24 +190,6 @@ def clean_text_for_alignment(bill_text,state):
     return bill_text_sections
 
 
-def model_clean_text_for_alignment(bill_text):
-    bill_text = clean_text(bill_text)
-
-    cleaned_text_list = cleaned_text.split('\n')
-
-    #delete lines with just number
-    re_string = '\\n\s[0-9][0-9]|\\n[0-9][0-9]|\\n[0-9]|\\n\s[0-9]'
-    cleaned_text_list = [re.sub(re_string,'',t) for t in cleaned_text_list]
-
-    #delete empty lines
-    cleaned_text_list = [re.sub( '\s+', ' ', x) for x in cleaned_text_list]
-    cleaned_text_list = [x for x in cleaned_text_list if x is not None and len(x)>2]
-
-    cleaned_text = ' '.join(cleaned_text_list)
-
-    return cleaned_text
-
-
 def test_clean_text_for_alignment(state):
     match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
     state_text = match['hits']['hits'][3]['_source']['bill_document_first']
