@@ -26,7 +26,7 @@ def bill_source_to_json_not_encoded(url,source,date):
     jsonObj['date'] = date
     jsonObj['source'] = source
 
-    return ujson.encode(jsonObj
+    return ujson.encode(jsonObj)
 
 #wrapper for urllib2.urlopen that catches URLERROR and socket error
 def fetch_url(url):
