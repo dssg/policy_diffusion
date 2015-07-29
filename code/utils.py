@@ -19,6 +19,15 @@ def bill_source_to_json(url,source,date):
 
     return ujson.encode(jsonObj)
 
+#creates a json object for bill sources (not encoded)
+def bill_source_to_json_not_encoded(url,source,date):
+    jsonObj = {}
+    jsonObj['url'] = url
+    jsonObj['date'] = date
+    jsonObj['source'] = source
+
+    return ujson.encode(jsonObj
+
 #wrapper for urllib2.urlopen that catches URLERROR and socket error
 def fetch_url(url):
 
