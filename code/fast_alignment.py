@@ -19,19 +19,29 @@ import pandas as pd
 import random
 from compiler.ast import flatten
 from sklearn.decomposition import PCA
-# from alignment.sequence import Sequence
-# from alignment.vocabulary import Vocabulary
-# from alignment.sequencealigner import SimpleScoring, GlobalSequenceAligner, LocalSequenceAligner
-# from utils import find_subsequence
 
+#repsrents two aligned pieces of text
+class Alignment(object):
 
-class Alignment():
-
-    def __init__(self, left_text, right_text):
+    def __init__(self,left_text,right_text,alignments,alignment_indices):
         self.left_text = left_text
         self.right_text = right_text
-        self.alignments = []
-        self.alignment_indices = []
+        self.alignments = alignments
+        self.alignment_indices = alignment_indices
+    
+    def dump_alignment_to_json(self):
+        pass
+
+    def annotate_alignment(self):
+        pass
+    
+
+class Aligner(object):
+
+    def __init__(self):
+        if not self._algorithm_name:
+            self._algorithm_name = "aligner"
+
 
     def _transform_text(self,a,b):
         """Converts a list of words into an numpy array of integers used by the alignment algorithm
@@ -57,14 +67,36 @@ class Alignment():
     def align():
         pass
 
-class LocalAlignment(Alignment):
+class LocalAligner(Aligner):
 
-    def align(self, match_score=3, mismatch_score=-1, gap_score=-2):
-        left = self.left_text
-        right = self.right_text
+    def __init__(self,match_score = 3,mismatch_score = -1,gap_score = -2):
+        
+        self._algorithm_name = "local_alignment"
+        
+        super(LocalAligner,self).__init__()
+        
+        self.match_score = match_score
+        self.mismatch_score = mismatch_score
+        self.gap_score = gap_score
+
+
+    def __str__(self):
+        
+        name_str = "{0} instance".format(self._algorithm_name)
+        param_str_1 = "match_score = {0}".format(self.gap_score)
+        param_str_2 = "mismatch_score = {0}".format(self.match_score)
+        param_str_3 = "gap_score = {0}".format(self.mismatch_score)
+        return "{0}: {1}, {2}, {3}".format(name_str,param_str_1,param_str_2,param_str_3)
+
+    def align(self,left,right):
+        
+        
+        alignments = []
+        alignment_indices = []
 
         a_ints, b_ints, word_map = self._transform_text(left, right)
-        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, match_score, mismatch_score, gap_score)
+        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, self.match_score,
+                self.mismatch_score, self.gap_score)
         l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
         reverse_word_map = {v:k for k,v in word_map.items()}
@@ -72,10 +104,10 @@ class LocalAlignment(Alignment):
         l = [reverse_word_map[w] for w in l]
         r = [reverse_word_map[w] for w in r]
 
-        self.alignment_indices.append(align_index)
-        self.alignments.append((score, l, r))
-
-        return [(score, l,r)]
+        alignment_indices.append(align_index)
+        alignments.append((score, l, r))
+    
+        return Alignment(left,right,alignments,alignment_indices)
 
     @jit
     def _compute_matrix(self, left, right, match_score, mismatch_score, gap_score):
@@ -159,7 +191,7 @@ class LocalAlignment(Alignment):
         return score
 
 ###Note: still slow
-class AffineLocalAlignment(Alignment):
+class AffineLocalAligner(Aligner):
 
     # @jit
     def align(self, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
@@ -276,14 +308,8 @@ class AffineLocalAlignment(Alignment):
 
         return score
 
-class SectionLocalAlignment(LocalAlignment):
-
-    def __init__(self, left_text, right_text):
-        self.left_text = left_text
-        #compare left sections to right document
-        self.right_text = flatten(right_text)
-        self.alignments = []
-        self.alignment_indices = []
+#aligns left and right text where left text is a list of sections
+class SectionLocalAligner(LocalAligner):
 
     '''
     Input:
@@ -292,18 +318,20 @@ class SectionLocalAlignment(LocalAlignment):
     Description:
         Local Alignment that looks for alignments by section
     '''
-    def align(self, match_score=3, mismatch_score=-1, gap_score=-2):
+    def align(self,left_sections,right):
         
-        right = self.right_text
+        alignments = []
+        alignment_indices = []
 
         #keeps track of beginning index of section
         #to recover correct indices of sections
         section_start_index = 0
 
-        for left in self.left_text:
+        for left in left_sections:
 
             a_ints, b_ints, word_map = self._transform_text(left, right)
-            score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, match_score, mismatch_score, gap_score)
+            score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, self.match_score,
+                    self.mismatch_score, self.gap_score)
             l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
             score = score_matrix.max()
@@ -313,18 +341,20 @@ class SectionLocalAlignment(LocalAlignment):
             l = [reverse_word_map[w] for w in l]
             r = [reverse_word_map[w] for w in r]
 
-            self.alignments.append((score, l, r))
-
+            alignments.append((score, l, r))
+            
             #adjust for section
             align_index['left_start'] += section_start_index
-            align_index['right_start'] += section_start_index
-
-            self.alignment_indices.append(align_index)
+            align_index['left_end'] += section_start_index
+            
+            alignment_indices.append(align_index)
 
             #update section_start_index
             section_start_index += len(left)
+        
+        left = reduce(lambda x,y:x+y,left_sections)
 
-        return self.alignments
+        return Alignment(left,right,alignments,alignment_indices)
 
 
 
