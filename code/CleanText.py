@@ -71,7 +71,7 @@ def split_to_sections(cleantext,state):
         chunked_list = cleantext.split('\nsection')
     elif state in ('nm','tx'):
         chunked_list = cleantext.split('\n section')
-    elif state in ('az','ia','nv', 'wa'):
+    elif state in ('az','ia','nv', 'wa', 'vt'):
         chunked_list = cleantext.split('\nsec.')
     elif state in ('me', 'mi'):
         chunked_list = cleantext.split('\n sec.')
