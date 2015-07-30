@@ -196,4 +196,17 @@ def test_clean_text_for_alignment(state):
 
     return clean_text_for_alignment(state_text, state)
 
+def clean_text_for_model_legislation(bill_text):
+    cleantext = clean_text(bill_text)
+    bill_text_sections = cleantext.split('\nsection')
+    bill_text_sections = delete_empty_sections(bill_text_sections)
+    bill_text_sections = delete_lines(bill_text_sections)
+    return bill_text_sections
+
+#delete boiler plate present in all alec exposed bills after "effective date"
+def delete_boiler_plate_alec_exposed (chunked_list):
+    chunked_list = [re.sub('({effective date).*$', ' ', x) for x in chunked_list]
+    chunked_list = chunked_list[1:]
+    return chunked_list
+
 #good example is test_clean_text_for_alignment('va')
