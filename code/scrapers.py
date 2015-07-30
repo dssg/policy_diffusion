@@ -177,15 +177,21 @@ def scrape_ALEC_model_legislation():
             f.write("{0}\n".format(Jsonbill))
 
     # Save old alec bills (from Center for the Media and Democracy)
+def scrape_alec_exposed_bills ():
     names = os.listdir('{0}/model_legislation/ALEC_exposed'.format(DATA_PATH))
     with open('alec_old_bills.json', 'w') as f2:
-        for name in names:
-            source2 = open(name, 'rb').read()
-            url2 = None
-            date2 = "2010 - 2013"
-            Jsonbill2 = utils.bill_source_to_json(url2, source2, date2)
-            f2.write("{0}\n".format(Jsonbill2))
-
+    for name in names:
+        try:
+            text = tp.from_file(name)
+            source = text['content']
+        except:
+            source = None
+        url = None
+        date = '2010-2013'
+        print name
+        print source
+        Jsonbill = bill_source_to_json(url, source, source)
+        f2.write("{0}\n".format(Jsonbill))
 
 
 def scrape_CSG_model_legislation():
