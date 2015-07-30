@@ -9,6 +9,10 @@ import time
 import multiprocessing
 
 
+def alignment_tokenizer(s,type = "space"):
+    if type == "space":
+        s = s.split(" ")
+    return s    
 
 #creates a searalized json object for bill sources
 def bill_source_to_json(url,source,date):

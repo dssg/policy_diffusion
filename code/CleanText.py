@@ -133,7 +133,7 @@ def split_to_sections(cleantext,state):
     elif state == None:
         chunked_list = cleantext.split("\n")
     else:
-        return None
+        chunked_list = cleantext.split("\n")
 
     return chunked_list
 
@@ -150,7 +150,6 @@ def delete_numbers_in_lines (chunked_list):
     decription:
         cleans pdf extractor errors where number of lines were included in text
     '''
-
     re_string = '\\n\s[0-9][0-9]|\\n[0-9][0-9]|\\n[0-9]|\\n\s[0-9]'
     chunked_list = [re.sub(re_string,'',t) for t in chunked_list]
     return chunked_list
