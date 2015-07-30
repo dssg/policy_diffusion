@@ -21,15 +21,15 @@ from compiler.ast import flatten
 from elasticsearch import Elasticsearch
 import re
 import csv
+from sklearn.metrics import roc_curve, auc
 
 
 #TODO: incorporate plotting into grid code; not sure how to do this in way that works for all algorithms
 
 class Experiment():
 
-    #TODO: how to include parameters for the algorithms in here
-    #use keyword arguments??
-    def __init__(self, bills ={}, algorithm=None, results = {}, grid = {}):
+    def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
+                gap_score = -2, gap_start = -5, gap_extend = -0.5):
     	self.bills = bills
     	self.algorithm = algorithm
         if bills == {}:
@@ -37,7 +37,11 @@ class Experiment():
         else:
     	   self.scores = np.zeros((max(self.bills.keys())+1, max(self.bills.keys())+1))
     	self.results = {}
-        self.grid = {}
+        self.match_score = match_score
+        self.mismatch_score = mismatch_score
+        self.gap_score = gap_score
+        self.gap_start = gap_start
+        self.gap_extend = gap_extend
 
 
     def evaluate(self):
@@ -48,7 +52,7 @@ class Experiment():
         return self.scores, self.results
 
 
-    def evaluate_algorithm(self, match_score = 3, mismatch_score = -1, gap_score = -2):
+    def evaluate_algorithm(self):
         '''
         args:
             matches: dictionary with field corresponding to text and match groups
@@ -69,41 +73,47 @@ class Experiment():
                     text1 = self._prepare_text_left(bills[i]['text'], bills[i]['state'])
                     text2 = self._prepare_text_right(bills[j]['text'], bills[j]['state'])
 
-                    # Create sequences to be aligned.
-                    f = self.algorithm(text1, text2)
-                    f.align(match_score, mismatch_score, gap_score)
+                    #instantiate aligner with appropriate parameters
+                    if self.algorithm == LocalAligner:
+                        f = self.algorithm(self.match_score, self.mismatch_score, self.gap_score)
+                    elif self.algorithm == AffineLocalAligner:
+                        f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
+                    alignment = f.align(text1, text2)
 
-                    self.scores[i,j] = self._get_score(f)
+                    self.scores[i,j] = self._get_score(alignment)
 
                     self.results[(i,j)] ={}
-                    self.results[(i,j)]['alignments'] = f.alignments
-                    self.results[(i,j)]['score'] = self._get_score(f)
+                    self.results[(i,j)]['alignments'] = alignment.alignments
+                    self.results[(i,j)]['score'] = self._get_score(alignment)
                     self.results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
-                    self.results[(i,j)]['diff'] = [self._diff(alignment) for alignment in f.alignments]
-                    self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in f.alignments]
+                    self.results[(i,j)]['diff'] = [self._diff(a) for a in alignment.alignments]
+                    self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in alignment.alignments]
 
-                    print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(f.alignments[0][0])
+                    print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignment.alignments[0][0])
 
         return self.scores, self.results
 
+    def plot_roc():
+        truth = [value['match'] for key, value in self.results.items()]
+        score = [value['score'] for key, value in self.results.items()]
 
-    def grid_search(self, match_scores = [2,3,4,5], mismatch_scores = [-1,-2,-3,-4,-5], gap_scores = [-1,-2,-3,-4,-5]):
-        
-        for match_score in match_scores:
-            for mismatch_score in mismatch_scores:
-                for gap_score in gap_scores:
+        fpr, tpr = roc_curve(truth, score)
+        roc_auc = auc(fpr, tpr)
 
-                    print 'running model: match_score {0} mismatch_score {1} gap_score {2}'.format(match_score, mismatch_score, gap_score)
+        plt.figure()
+        plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic example')
+        plt.legend(loc="lower right")
+        plt.show()
 
-                    self.grid[(match_score, mismatch_score, gap_score)] = {}
-                    self.evaluate_algorithm(bills, match_score, mismatch_score, gap_score)
-                    self.grid[(match_score, mismatch_score, gap_score)]['results'] = self.results
-                    self.grid[(match_score, mismatch_score, gap_score)]['scores'] = self.scores
-
-        return self.grid
 
     def save(self, name):
-        with open('../data/{0}.p'.format(name), 'wb') as fp:
+        with open('../data/experiment_results/{0}.p'.format(name), 'wb') as fp:
             pickle.dump(self, fp)
 
     @abc.abstractmethod
@@ -117,7 +127,7 @@ class Experiment():
 
 
     @abc.abstractmethod
-    def _get_score(self, alignment_alg):
+    def _get_score(self, alignment):
         pass
 
     #alignment feature methods
@@ -267,8 +277,8 @@ class DocExperiment(Experiment):
         return text.split()
 
 
-    def _get_score(self, alignment_alg):
-        return alignment_alg.alignments[0][0]
+    def _get_score(self, alignment):
+        return alignment.alignments[0][0]
 
 
 class SectionExperiment(Experiment):
@@ -287,11 +297,122 @@ class SectionExperiment(Experiment):
         return flatten(map(lambda x: x.split(), text))
 
 
-    def _get_score(self, alignment_alg):
+    def _get_score(self, alignment):
 
-        scores = [score for score, left, right in alignment_alg.alignments]
+        scores = [score for score, left, right in alignment.alignments]
 
         return sum(scores)
+
+
+class GridSearch():
+
+    def __init__(self, bills, algorithm, match_scores = [2,3,4], mismatch_scores = [-1,-2,-3], 
+                gap_scores = [-1,-2,-3], gap_starts = [-2,-3,-4], gap_extends = [-0.5,-1,-1.5]):
+        self.bills = bills
+        self.algorithm = algorithm
+        if bills == {}:
+            self.scores = None
+        else:
+           self.scores = np.zeros((max(self.bills.keys())+1, max(self.bills.keys())+1))
+        self.grid = {}
+        self.grid_df = None
+        self.match_score = match_scores
+        self.mismatch_score = mismatch_scores
+        self.gap_score = gap_scores
+        self.gap_start = gap_starts
+        self.gap_extend = gap_extends
+
+
+    def grid_search(self):
+        #only works for doc experiemnt currently
+        #determine parameters to do grid search on for given algorithm
+        if self.algorithm == LocalAligner:    
+            for match_score in self.match_scores:
+                for mismatch_score in self.mismatch_scores:
+                    for gap_score in self.gap_scores:
+
+                        print 'running LocalAligner model: match_score {0} mismatch_score {1} gap_score {2}'.format(match_score, mismatch_score, gap_score)
+
+                        e = DocExperiment(self.bills, LocalAligner, match_score = match_score, 
+                                            mismatch_score = mismatch_score, gap_score = gap_score)
+
+                        self.evaluate_algorithm()
+
+                        self.grid[(match_score, mismatch_score, gap_score)] = {}
+                        self.grid[(match_score, mismatch_score, gap_score)]['results'] = e.results
+                        self.grid[(match_score, mismatch_score, gap_score)]['scores'] = e.scores
+
+        elif self.algorithm == AffineLocalAligner:
+            for match_score in self.match_scores:
+                for mismatch_score in self.mismatch_scores:
+                    for gap_start in self.gap_starts:
+                        for gap_extend in self.gap_extends:
+
+                            print 'running AffineLocalAligner model: match_score {0} mismatch_score {1} \
+                                    gap_start {2} gap_extend'.format(match_score, mismatch_score,
+                                                                     gap_start, gap_extend)
+
+                            e = DocExperiment(self.bills, LocalAligner, match_score = match_score, 
+                                                mismatch_score = mismatch_score, gap_score = gap_score)
+
+                            e.evaluate_algorithm()
+
+                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)] = {}                            
+                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)]['results'] = e.results
+                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)]['scores'] = e.scores                            
+
+            return self.grid
+
+
+    def _create_grid_df(self):
+        t = []
+        for key1, value1 in grid.items():
+            for key2, value2 in value1['results'].items():
+                t.append(list(key1) + [key2, value2['score'], value2['match']])
+    
+        self.grid_df = pd.DataFrame(t)
+
+        if self.algorithm == LocalAligner:
+            self.grid_df.columns = ['match_score', 'mismatch_score', 'gap_score', 'pair', 'score', 'match']
+        elif self.algorithm == AffineLocalAligner:
+            self.grid_df.columns = ['match_score', 'mismatch_score', 'gap_start', 'gap_extend', 'pair', 'score', 'match']
+
+    def plot_grid(self):
+
+        self._create_grid_df()
+
+        df = self.grid_df
+        #make maximum possible 500
+        df.loc[df['score']>500,'score'] = 500
+
+        #match plot
+        df_match = df[(df['mismatch_score'] == -2) & (df['gap_score'] == -1)]
+
+        g = sns.FacetGrid(df_match, col="match_score")
+        g = g.map(sns.boxplot, "match", "score")
+        sns.plt.ylim(0,400)
+        sns.plt.show()
+
+        #mismatch plot
+        df_mismatch = df[(df['match_score'] == 3) & (df['gap_score'] == -1)]
+
+        g = sns.FacetGrid(df_mismatch, col="mismatch_score")
+        g = g.map(sns.boxplot, "match", "score")
+        sns.plt.ylim(0,400)
+        sns.plt.show()
+
+        #gap plot
+        df_gap = df[(df['match_score'] == 3) & (df['mismatch_score'] == -2)]
+
+        g = sns.FacetGrid(df_gap, col="gap_score")
+        g = g.map(sns.boxplot, "match", "score")
+        sns.plt.ylim(0,400)
+        sns.plt.show()
+
+    def save(self, name):
+        with open('../data/grid_results/{0}.p'.format(name), 'wb') as fp:
+            pickle.dump(self, fp)
+
 
 ############################################################
 ##helper function
@@ -408,121 +529,6 @@ def test_alignment_features():
 
 ############################################################
 ##data creating, saving, and loading
-def create_bills(ls):
-    '''
-    args:
-        ls: list of lists of urls that correspond to matches
-
-    returns:
-        dictionary grouped by matches
-    '''
-    k = 0
-    bill_id = 0
-    bills = {}
-    bad_count = 0
-    for urls in ls:
-        for url,state in urls:
-            try:
-                print "bill_id: " + str(bill_id)
-                bills[bill_id] = {}
-                doc = urllib2.urlopen(url).read()
-                text = parser.from_buffer(doc)['content'] 
-                bills[bill_id]['url'] = url
-                bills[bill_id]['text'] = text
-                bills[bill_id]['match'] = k
-                bills[bill_id]['state'] = state
-            except:
-                pass
-                bad_count += 1
-                print 'bad_count: ', bad_count
-            bill_id += 1
-        k += 1
-
-    try:
-        for bill in bills.keys():
-            if bills[bill] == {} or bills[bill]['text'] == '' \
-                or bills[bill]['text'] == None:
-                
-                del bills[bill]
-    except:
-        pass
-
-    #get more evaluation bills
-    eval_bills = grab_more_eval_bills()
-    for bills in eval_bills:
-        k +=1
-        for bill_text in bill:
-            bill_id += 1
-
-            bills[bill_id] = {}
-            bills[bill_id]['text'] = text
-            bills[bill_id]['state'] = state
-
-    return bills
-
-def get_bill_by_id(unique_id):
-    es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
-    match = es.search(index="state_bills", body={"query": {"match": {'unique_id': unique_id}}})
-    bill_text = match['hits']['hits'][0]['_source']['bill_document_first']
-    return bill_text
-
-def grab_more_eval_bills():
-    with open('../data/evaluation_set/bills_for_evaluation_set.csv') as f:
-        bills_list = [row for row in csv.reader(f.read().splitlines())]
-        
-    bill_ids_list = []
-    url_lists = []
-    topic_list = []
-    for i in range(len(bills_list)):
-        state = bills_list[i][1]
-        topic = bills_list[i][0]
-        bill_number = bills_list[i][2]
-        bill_number = re.sub(' ', '', bill_number)
-        year = bills_list[i][3]
-        url = bills_list[i][6]
-        unique_id = str(state + '_' + year + '_' + bill_number)
-        topic_list.append(topic)
-        bill_ids_list.append(unique_id)
-        url_lists.append(url)
-
-    bills_ids = zip(bill_ids_list, url_lists)
-
-    bills_text = []
-    state_list = []
-    for i in range(len(bills_ids)):
-        try:
-            bill_text = get_bill_by_id(bills_ids[i][0])
-        except IndexError:
-            try:
-                url = bills_ids[i][1]
-                doc = urllib.urlopen(url)
-                bill_text = parser.from_buffer(doc)['content']
-                print url
-            except IOError:
-                bill_text = None
-        bills_text.append(bill_text)
-        state = bills_ids[i][0][0:2]
-        state_list.append(state)
-
-    bills_state = zip(bills_text, state_list, topic_list)
-
-    bill_type_1 = []
-    bill_type_2 = []
-    for bill in bills_state:
-        if bill[-1] == 'Adult Guardianship and Protective Proceedings Jurisdiction Act':
-            bill_type_1.append((bill[0],bill[1]))
-        else:
-            bill_type_2.append((bill[0],bill[1]))
-
-    return [bill_type_2, bill_type_1]
-
-def create_save_bills(bill_list):
-    bills = create_bills(bill_list)
-    with open('../data/bills.p', 'wb') as fp:
-        pickle.dump(bills, fp)
-
-    return bills
-
 
 def load_bills():
     with open('../data/bills.p','rb') as fp:
@@ -555,88 +561,22 @@ def load_results():
 
 
 if __name__ == '__main__':
-    #each list in this list of lists contains bills that are matches
-    similar_bills = [[('http://www.azleg.gov/legtext/52leg/1r/bills/hb2505p.pdf', 'az'),
-    ('http://www.legis.state.ak.us/basis/get_bill_text.asp?hsid=SB0012B&session=29', 'ak' ),
-    ('http://www.capitol.hawaii.gov/session2015/bills/HB9_.PDF', 'hi'),
-    ('http://www.capitol.hawaii.gov/session2015/bills/HB1047_.PDF', 'hi'),
-    ('http://flsenate.gov/Session/Bill/2015/1490/BillText/Filed/HTML','fl'),
-    ('http://ilga.gov/legislation/fulltext.asp?DocName=09900SB1836&GA=99&SessionId=88&DocTypeId=SB&LegID=88673&DocNum=1836&GAID=13&Session=&print=true','il'),
-    ('http://www.legis.la.gov/Legis/ViewDocument.aspx?d=933306', 'la'),
-    ('http://mgaleg.maryland.gov/2015RS/bills/sb/sb0040f.pdf', 'md'),
-    ('http://www.legislature.mi.gov/documents/2015-2016/billintroduced/House/htm/2015-HIB-4167.htm', 'mi'),
-    ('https://www.revisor.mn.gov/bills/text.php?number=HF549&version=0&session=ls89&session_year=2015&session_number=0','mn'),
-    ('http://www.njleg.state.nj.us/2014/Bills/A2500/2354_R2.HTM','nj'),
-    ('http://assembly.state.ny.us/leg/?sh=printbill&bn=A735&term=2015','ny'),
-    ('http://www.ncga.state.nc.us/Sessions/2015/Bills/House/HTML/H270v1.html','nc'),
-    ('https://olis.leg.state.or.us/liz/2015R1/Downloads/MeasureDocument/HB2005/A-Engrossed','or'),
-    ('https://olis.leg.state.or.us/liz/2015R1/Downloads/MeasureDocument/SB947/Introduced','or'),
-    ('http://www.legis.state.pa.us/CFDOCS/Legis/PN/Public/btCheck.cfm?txtType=HTM&sessYr=2015&sessInd=0&billBody=H&billTyp=B&billNbr=0624&pn=0724', 'pa'),
-    ('http://www.scstatehouse.gov/sess121_2015-2016/prever/172_20141203.htm','sc'),
-    ('http://lawfilesext.leg.wa.gov/Biennium/2015-16/Htm/Bills/House%20Bills/1356.htm', 'wa'),
-    ('http://www.legis.state.wv.us/Bill_Status/bills_text.cfm?billdoc=hb2874%20intr.htm&yr=2015&sesstype=RS&i=2874','wv'),
-    ('http://www.legis.state.wv.us/Bill_Status/bills_text.cfm?billdoc=hb2874%20intr.htm&yr=2015&sesstype=RS&i=2874', 'wv'),
-    ('ftp://ftp.cga.ct.gov/2015/tob/h/2015HB-06784-R00-HB.htm','ct'),
-    ('http://www.capitol.hawaii.gov/session2015/bills/SB129_.PDF','hi'),
-    ('http://nebraskalegislature.gov/FloorDocs/104/PDF/Intro/LB493.pdf', 'ne'),
-    ('http://www.gencourt.state.nh.us/legislation/2015/HB0600.html', 'nh')],
-    [('http://alecexposed.org/w/images/2/2d/7K5-No_Sanctuary_Cities_for_Illegal_Immigrants_Act_Exposed.pdf', None),
-    ('http://www.kslegislature.org/li_2012/b2011_12/measures/documents/hb2578_00_0000.pdf', 'ks'),
-    ('http://flsenate.gov/Session/Bill/2011/0237/BillText/Filed/HTML','fl'),
-    ('http://openstates.org/al/bills/2012rs/SB211/','al'),
-    ('http://le.utah.gov/~2011/bills/static/HB0497.html','ut'),
-    ('http://webserver1.lsb.state.ok.us/cf_pdf/2013-14%20FLR/HFLR/HB1436%20HFLR.PDF','ok')],
-    [('http://www.alec.org/model-legislation/the-disclosure-of-hydraulic-fracturing-fluid-composition-act/', None),
-    ('ftp://ftp.legis.state.tx.us/bills/82R/billtext/html/house_bills/HB03300_HB03399/HB03328S.htm', 'tx')],
-    [('http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm', 'mi'),
-    ('http://www.schouse.gov/sess116_2005-2006/bills/4301.htm','sc'),
-    ('http://www.lrc.ky.gov/record/06rs/SB38.htm', 'ky'),
-    ('http://www.okhouse.gov/Legislation/BillFiles/hb2615cs%20db.PDF', 'ok'),
-    ('http://state.tn.us/sos/acts/105/pub/pc0210.pdf', 'tn'),
-    ('https://docs.legis.wisconsin.gov/2011/related/proposals/ab69', 'wi'),
-    ('http://legisweb.state.wy.us/2008/Enroll/HB0137.pdf', 'wy'),
-    ('http://www.kansas.gov/government/legislative/bills/2006/366.pdf', 'ks'),
-    ('http://billstatus.ls.state.ms.us/documents/2006/pdf/SB/2400-2499/SB2426SG.pdf', 'mi')],
-    [('http://www.alec.org/model-legislation/state-withdrawal-from-regional-climate-initiatives/', None),
-    ('http://www.legislature.mi.gov/documents/2011-2012/resolutionintroduced/House/htm/2011-HIR-0134.htm', 'mi'),
-    ('http://www.nmlegis.gov/Sessions/11%20Regular/memorials/house/HJM024.html', 'nm')],
-    [('http://alecexposed.org/w/images/9/90/7J1-Campus_Personal_Protection_Act_Exposed.pdf', None),
-    ('ftp://ftp.legis.state.tx.us/bills/831/billtext/html/house_bills/HB00001_HB00099/HB00056I.htm', 'tx')],
-    # [
-    # ('http://essexuu.org/ctstat.html', 'ct'), we don't have connecituc
-    # ('http://alisondb.legislature.state.al.us/alison/codeofalabama/constitution/1901/CA-170364.htm', 'al')],
-    [('http://www.legis.state.ak.us/basis/get_bill_text.asp?hsid=HB0162A&session=27', 'ak'),
-    ('https://legiscan.com/AL/text/HB19/id/327641/Alabama-2011-HB19-Enrolled.pdf', 'al'),
-    ('http://www.leg.state.co.us/clics/clics2012a/csl.nsf/fsbillcont3/0039C9417C9D9D5D87257981007F3CC9?open&file=1111_01.pdf', 'co'),
-    ('http://www.capitol.hawaii.gov/session2012/Bills/HB2221_.PDF', 'hi'),
-    ('http://ilga.gov/legislation/fulltext.asp?DocName=09700HB3058&GA=97&SessionId=84&DocTypeId=HB&LegID=60409&DocNum=3058&GAID=11&Session=&print=true', 'il'),
-    ('http://coolice.legis.iowa.gov/Legislation/84thGA/Bills/SenateFiles/Introduced/SF142.html', 'ia'),
-    ('ftp://www.arkleg.state.ar.us/Bills/2011/Public/HB1797.pdf','ar'),
-    ('http://billstatus.ls.state.ms.us/documents/2012/html/HB/0900-0999/HB0921SG.htm', 'ms'),
-    ('http://www.leg.state.nv.us/Session/76th2011/Bills/SB/SB373.pdf', 'nv'),
-    ('http://www.njleg.state.nj.us/2012/Bills/A1000/674_I1.HTM', 'nj'),
-    ('http://webserver1.lsb.state.ok.us/cf_pdf/2011-12%20INT/hB/HB2821%20INT.PDF', 'ok'),
-    ('http://www.legis.state.pa.us/CFDOCS/Legis/PN/Public/btCheck.cfm?txtType=PDF&sessYr=2011&sessInd=0&billBody=H&billTyp=B&billNbr=0934&pn=1003', 'pa'),
-    ('http://www.capitol.tn.gov/Bills/107/Bill/SB0016.pdf', 'tn')],
-    [('http://www.legislature.idaho.gov/idstat/Title39/T39CH6SECT39-608.htm', 'id'),
-    ('http://www.legis.nd.gov/cencode/t12-1c20.pdf?20150708171557', 'nd')]
-    ]
 
-    # bills = create_save_bills(similar_bills)
     bills = load_bills()
 
     print 'testing local alignment'
-    e = DocExperiment(bills, LocalAlignment)
+    e = DocExperiment(bills, LocalAligner)
 
     e.evaluate_algorithm()
 
-    with open('../data/experiment.p', 'wb') as fp:
-        pickle.dump(e, fp)
+    e.save('local_experiment')
 
     # print 'testing section local alignment'
     # e = SectionExperiment(bills, SectionLocalAlignment)
     # e.evaluate_algorithm()
 
-    # with open('../data/results_section.p', 'wb') as fp:
-    #     pickle.dump(e.results, fp)
+    # e.save('section_experiment')
+
+    # print 'testing grid alignment'
+
 
