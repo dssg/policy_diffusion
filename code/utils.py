@@ -9,6 +9,10 @@ import time
 import multiprocessing
 
 
+def alignment_tokenizer(s,type = "space"):
+    if type == "space":
+        s = s.split(" ")
+    return s    
 
 #creates a searalized json object for bill sources
 def bill_source_to_json(url,source,date):
@@ -16,6 +20,15 @@ def bill_source_to_json(url,source,date):
     jsonObj['url'] = url
     jsonObj['date'] = date
     jsonObj['source'] = base64.b64encode(source)
+
+    return ujson.encode(jsonObj)
+
+#creates a json object for bill sources (not encoded)
+def bill_source_to_json_not_encoded(url,source,date):
+    jsonObj = {}
+    jsonObj['url'] = url
+    jsonObj['date'] = date
+    jsonObj['source'] = source
 
     return ujson.encode(jsonObj)
 
