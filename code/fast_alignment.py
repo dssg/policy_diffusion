@@ -19,9 +19,9 @@ import pandas as pd
 import random
 from compiler.ast import flatten
 from sklearn.decomposition import PCA
-from alignment.sequence import Sequence
-from alignment.vocabulary import Vocabulary
-from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
+# from alignment.sequence import Sequence
+# from alignment.vocabulary import Vocabulary
+# from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
 
 #TODO: use alignment algorithm
 #repsrents two aligned pieces of text
@@ -214,13 +214,14 @@ class AffineLocalAligner(LocalAligner):
         alignment_indices = []
 
         a_ints, b_ints, word_map = self._transform_text(left, right)
-        M, X, Y, pointer_matrix = self._compute_matrix(a_ints, b_ints, 
+        H, pointer_matrix = self._compute_matrix(a_ints, b_ints, 
                                         self.match_score, self.mismatch_score, 
                                         self.gap_start, self.gap_extend)
         
-        l, r, score, align_index = self._backtrace(a_ints, b_ints, np.maximum(M, X, Y) , pointer_matrix)
+        l, r, score, align_index = self._backtrace(a_ints, b_ints, H , pointer_matrix, self.match_score, self.mismatch_score, 
+                                        self.gap_start, self.gap_extend)
 
-        score = np.maximum(M,X,Y).max()
+        score = H.max()
 
         reverse_word_map = {v:k for k,v in word_map.items()}
         reverse_word_map["-"] = "-" 
@@ -268,7 +269,7 @@ class AffineLocalAligner(LocalAligner):
 
                 pointer_matrix[i,j] = max_decision        
         
-        return H, F, E, pointer_matrix
+        return H, pointer_matrix
 
     # @jit
     # def _compute_matrix(self, left, right, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
@@ -315,6 +316,53 @@ class AffineLocalAligner(LocalAligner):
     #             pointer_matrix[i,j] = max_decision
         
     #     return M, X, Y, pointer_matrix
+
+    @jit
+    def _backtrace(self, left, right, H, pointer_matrix, match_score,
+                 mismatch_score, gap_start, gap_extend):
+
+        i,j = np.unravel_index(H.argmax(), H.shape)
+
+        score = H[i,j]
+
+        #store start of alignment index
+        align_index = {}
+        align_index['left_end'] = i
+        align_index['right_end'] = j
+
+        #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
+        decision = pointer_matrix[i,j]
+
+        left_alignment = []
+        right_alignment = []
+        while H[i,j] > 0 and i > 0 and j > 0:
+            if left[i-1] == right[j-1]:
+                score = match_score
+            else:
+                score = mismatch_score
+            if H[i,j] == H[i-1,j-1] + score: #do not insert space
+                i -= 1
+                j -= 1
+                left_alignment = [left[i]] + left_alignment
+                right_alignment = [right[j]] + right_alignment
+            elif H[i,j] == H[i,j-1] + gap_start + gap_extend: #insert space in left text
+                j -= 1
+                right_alignment = [right[j]] + right_alignment
+                left_alignment = ['-'] + left_alignment
+            elif H[i,j] == H[i-1,j] + gap_start + gap_extend: #insert space in left text
+                i -= 1
+                left_alignment = [left[i]] + left_alignment
+                right_alignment = ['-'] + right_alignment
+
+            #update decision
+            decision = pointer_matrix[i,j]
+
+        align_index['left_start'] = i
+        align_index['right_start'] = j
+
+        # self.alignments.append((score, left_alignment, right_alignment))
+
+        return left_alignment, right_alignment, score, align_index
 
     def alignment_score(self,l,r):
         score = 0
