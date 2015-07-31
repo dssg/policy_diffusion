@@ -30,9 +30,31 @@ class Alignment(object):
     def __init__(self,left_text,right_text,alignments,alignment_indices):
         self.left_text = left_text
         self.right_text = right_text
+
+        alignments.sort(key = lambda x:x[0],reverse = True)
         self.alignments = alignments
+
         self.alignment_indices = alignment_indices
     
+    def __unicode__(self):
+        output_string = ""
+        u" ".join([output_string,u"alignments:   \n\n"])            
+        
+        for i,alignment in enumerate(self.alignments):
+            line_breaker = u"\n{0}\n\n".format(i)
+            
+            score = u"{:.2f}".format(alignment[0])
+            l = u" ".join(alignment[1])
+            r = u" ".join(alignment[2])
+            content = u"{0}\n{1}\n{2}".format(score,l,r)
+            output_string = u"{0}{1}{2}".format(output_string,line_breaker,content)
+        
+        return output_string
+    
+    def __str__(self):
+
+        return self.__unicode__().encode("utf-8")
+
     def dump_alignment_to_json(self):
         pass
 
