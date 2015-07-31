@@ -112,9 +112,12 @@ class Experiment():
         plt.show()
 
 
-    def save(self, name):
-        with open('../data/experiment_results/{0}.p'.format(name), 'wb') as fp:
-            pickle.dump(self, fp)
+    def save(self):
+        if self.algorithm == LocalAligner:
+            with open('../data/experiment_results/experiment_{0}_m_{1}_mm_{2}_g_{3}.p'.format(self.algorithm._algorithm_name, 
+                                self.match_score, self.mismatch_score, self.gap_score), 'wb') as fp:
+                
+        pickle.dump(self, fp)
 
     @abc.abstractmethod
     def _prepare_text_left(self):
