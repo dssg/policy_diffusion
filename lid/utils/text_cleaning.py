@@ -6,8 +6,6 @@ import elasticsearch
 import re
 import string
 import urllib2
-from tika import parser
-from collections import defaultdict
 from elasticsearch import Elasticsearch
 from pprint import pprint
 import nltk
@@ -159,22 +157,20 @@ def delete_lines (chunked_list):
         
 
 
-def clean_document(doc_text,doc_type = None,state_id = None,split_to_section = False):
+def clean_document(doc_text,doc_type = "text",split_to_section = False,**kwargs):
     """text -- document text
-       doc_type --- the type of the document, if state bill it is state code,
-       if model legistlation it is "model_legislation" or it isn't specified and None
-    """
+       doc_type --- the type of the document ( "state_bill", "model_legislation", "None")    """
     
-    if doc_type == "state_bill" and state_id == "None":
+    if doc_type == "state_bill" and "state_id" not in kwargs:
         print "need to specify state_id"
         exit()
 
 
     if doc_type == "state_bill":
         doc_text = clean_text(doc_text)
-        doc_text_sections = split_to_sections(doc_text,state_id)
+        doc_text_sections = split_to_sections(doc_text,kwargs['state_id'])
         doc_text_sections = delete_empty_sections(doc_text_sections)
-        if state_id in ['or','ok','ne','pa']:
+        if kwargs['state_id'] in ['or','ok','ne','pa']:
             doc_text_sections = delete_numbers_in_lines(doc_text_sections)
         doc_text_sections = delete_lines(doc_text_sections)
     
@@ -184,7 +180,7 @@ def clean_document(doc_text,doc_type = None,state_id = None,split_to_section = F
         doc_text_sections = delete_empty_sections(doc_text_sections)
         doc_text_sections = delete_lines(doc_text_sections)
         
-    elif doc_type == None:
+    elif doc_type == "text":
         doc_text = clean_text(doc_text)
         doc_text_sections = doc_text.split('\n')
         doc_text_sections = delete_empty_sections(doc_text_sections)

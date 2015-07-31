@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 
-with open('bill_similarity_matrix.json') as data_file:
+with open('/Users/mattburg/Dropbox/bill_similarity_matrix.json') as data_file:
     data = json.load(data_file)
 
 #data = {'ca_1': [{'id': 'ks_2', 'score': 134, 'state': 'ks'}, {'id': 'wy_12', 'score': 80, 'state': 'wy'}],'wa_3': [{'id': 'ca_1', 'score': 20, 'state': 'ca'}, {'id': 'al_5', 'score': 40, 'state': 'al'}]} 
