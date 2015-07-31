@@ -1,1 +1,1 @@
-rsync -avz --exclude=".*" -e "ssh -i /Users/jkatzsamuels/.ssh/jkatzsamuels.pem" $POLICY_DIFFUSION jkatzsamuels@54.212.36.132:/home/jkatzsamuels/
+rsync -avz --exclude=".*" -e "ssh -i /Users/jkatzsamuels/.ssh/jkatzsamuels.pem" $POLICY_DIFFUSION jkatzsamuels@54.203.12.145:/home/jkatzsamuels/

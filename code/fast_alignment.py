@@ -4,6 +4,7 @@ module that contains Alignment class and sub classes
 
 from __future__ import division
 import numpy as np
+import sys
 from numba import jit
 import itertools
 import time
@@ -19,7 +20,11 @@ import pandas as pd
 import random
 from compiler.ast import flatten
 from sklearn.decomposition import PCA
+from alignment.sequence import Sequence
+from alignment.vocabulary import Vocabulary
+from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
 
+#TODO: use alignment algorithm
 #repsrents two aligned pieces of text
 class Alignment(object):
 
@@ -158,7 +163,6 @@ class LocalAligner(Aligner):
                 score_matrix[i,j] = scores[max_decision]
         
         return score_matrix, pointer_matrix
-
     @jit
     def _backtrace(self, left, right, score_matrix, pointer_matrix):
 
@@ -201,132 +205,168 @@ class LocalAligner(Aligner):
 
         return left_alignment, right_alignment, score, align_index
 
-    def alignment_score(self, l, r,match_score=3, mismatch_score=-1, gap_score=-2):
+    def alignment_score(self, l, r):
         score = 0
         for i in range(len(l)):
             if l[i] == r[i]:
-                score += match_score
+                score += self.match_score
             elif l[i] == '-' or r[i] == '-':
-                score += gap_score
+                score += self.gap_score
             else:
-                score += mismatch_score
+                score += self.mismatch_score
 
         return score
 
 ###Note: still slow
-class AffineLocalAligner(Aligner):
+class AffineLocalAligner(LocalAligner):
 
-    # @jit
-    def align(self, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
-        left = self.left_text
-        right = self.right_text
+    def __init__(self, match_score=3, mismatch_score=-1, gap_start=-3, gap_extend = -.5):
+        
+        self._algorithm_name = "affine_local_alignment"
+        
+        super(AffineLocalAligner,self).__init__()
+        
+        self.match_score = match_score
+        self.mismatch_score = mismatch_score
+        self.gap_start = gap_start
+        self.gap_extend = gap_extend
+
+
+    def align(self, left, right):
+
+        alignments = []
+        alignment_indices = []
 
         a_ints, b_ints, word_map = self._transform_text(left, right)
-        M, X, Y, pointer_matrix = self._compute_matrix(a_ints, b_ints, match_score, mismatch_score, gap_start, gap_extend)
-        l, r = self._backtrace(a_ints, b_ints, M, X, Y, pointer_matrix)
+        H, pointer_matrix = self._compute_matrix(a_ints, b_ints, 
+                                        self.match_score, self.mismatch_score, 
+                                        self.gap_start, self.gap_extend)
+        
+        l, r, score, align_index = self._backtrace(a_ints, b_ints, H , pointer_matrix, self.match_score, self.mismatch_score, 
+                                        self.gap_start, self.gap_extend)
 
-        score = np.maximum(M,X,Y).max()
+        score = H.max()
 
         reverse_word_map = {v:k for k,v in word_map.items()}
         reverse_word_map["-"] = "-" 
         l = [reverse_word_map[w] for w in l]
         r = [reverse_word_map[w] for w in r]
 
-        return [(score, l,r)]
+        alignment_indices.append(align_index)
+        alignments.append((score, l, r))
+    
+        return Alignment(left,right,alignments,alignment_indices)
+
 
     @jit
     def _compute_matrix(self, left, right, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
         m = len(left) + 1
         n = len(right) + 1
-        M = np.zeros((m, n), float) #best ending in match or mismatch
-        X = np.zeros((m, n), float) #best ending in space in X
-        Y = np.zeros((m, n), float) #best ending in space in Y
+        H = np.zeros((m, n), float) #best match ending at i,j
+        F = np.zeros((m, n), float) #best ending in space in X
+        E = np.zeros((m, n), float) #best ending in space in Y
         pointer_matrix = np.zeros((m,n), int)
 
-        #initialize values of matrices
-        for i in range(m):
-            M[i,0] = np.NINF
-        for i in range(n):
-            M[0,i] = np.NINF
+        H[0,0] = 0
+        for i in range(1,m):
+            score = gap_start + i*gap_extend
+            H[i,0] = score
+            E[i,0] = score
+            H[0,i] = score
+            F[0,i] = score
 
-        for i in range(m):
-            X[i,0] = np.NINF
-        for i in range(n):
-            X[0,i] = gap_start + i * gap_extend
-
-        for i in range(m):
-            X[i,0] = gap_start + i * gap_extend
-        for i in range(n):
-            X[0,i] = np.NINF
-
-        scores = np.zeros((4), int)
         for i in xrange(1, m):
             for j in xrange(1, n):
-                
-                #0 represents restart below
+
+                F[i,j] = max(F[i-1,j]+gap_extend, H[i-1,j]+gap_start+gap_extend)
+
+                E[i,j] = max(E[i,j-1]+gap_extend, H[i,j-1] + gap_start + gap_extend)
+
                 if left[i-1] == right[j-1]:
-                    M[i,j] = max(max(M[i-1,j-1], X[i-1,j-1], Y[i-1,j-1]) + match_score, 0)
+                    scores = np.array([0,  H[i-1,j-1]+match_score, F[i,j], E[i,j]])
+                    H[i,j] = max(scores)
+                    max_decision = np.argmax(scores)
                 else:
-                    M[i,j] = max(max(M[i-1,j-1], X[i-1,j-1], Y[i-1,j-1]) + mismatch_score, 0)
+                    scores = np.array([0,  H[i-1,j-1]+mismatch_score, F[i,j], E[i,j]])
+                    H[i,j] = max(scores)
+                    max_decision = np.argmax(scores)
 
-                X[i,j] = max(gap_start+gap_extend+M[i,j-1], gap_extend + X[i,j-1], gap_start + gap_extend + Y[i,j-1],0)
-                
-                Y[i,j] = max(gap_start + gap_extend + M[i-1,j], gap_start+gap_extend+X[i-1,j], gap_extend+Y[i-1,j],0)    
-
-                scores = np.array([0, M[i,j], X[i,j], Y[i,j]]) #TODO: does it make sense to terminate backtracing when 0?
-                max_decision = np.argmax(scores)
-
-                pointer_matrix[i,j] = max_decision
+                pointer_matrix[i,j] = max_decision        
         
-        return M, X, Y, pointer_matrix
+        return H, pointer_matrix
+
 
     @jit
-    def _backtrace(self, left, right, M, X, Y, pointer_matrix):
-        
-        #only need to know the position with max value
-        score_matrix = np.maximum(M, X, Y) 
+    def _backtrace(self, left, right, H, pointer_matrix, match_score,
+                 mismatch_score, gap_start, gap_extend):
 
-        i,j = np.unravel_index(score_matrix.argmax(), score_matrix.shape)
+        i,j = np.unravel_index(H.argmax(), H.shape)
+
+        score = H[i,j]
+
+        #store start of alignment index
+        align_index = {}
+        align_index['left_end'] = i
+        align_index['right_end'] = j
+
         #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
         decision = pointer_matrix[i,j]
 
         left_alignment = []
         right_alignment = []
-        while decision != 0 and i > 0 and j > 0:
-            if decision == 1: #do not insert space
+        while H[i,j] != 0:
+            if left[i-1] == right[j-1]:
+                score = match_score
+            else:
+                score = mismatch_score
+            if H[i,j] == H[i-1,j-1] + score: #do not insert space
                 i -= 1
                 j -= 1
                 left_alignment = [left[i]] + left_alignment
                 right_alignment = [right[j]] + right_alignment
-            elif decision == 2: #insert space in right text
+            elif H[i,j] == H[i,j-1] + gap_start + gap_extend: #insert space in left text
                 j -= 1
                 right_alignment = [right[j]] + right_alignment
                 left_alignment = ['-'] + left_alignment
-            elif decision == 3: #insert space in left text
+            elif H[i,j] == H[i-1,j] + gap_start + gap_extend: #insert space in left text
                 i -= 1
                 left_alignment = [left[i]] + left_alignment
                 right_alignment = ['-'] + right_alignment
+            else:
+                print "backtrace did not work properly; there is an error \n"
 
-            #update decision
-            decision = pointer_matrix[i,j]
+                print "i,j: ", i,j
+                print "H[i,j]: ", H[i,j]
+                print "H[i,j-1] + gap_start + gap_extend: ", H[i,j-1] + gap_start + gap_extend
+                print "H[j-1, i] + gap_start + gap_extend: ", H[j-1, i] + gap_start + gap_extend
+                print "H[i-1,j-1] + score: ", H[i-1,j-1] + score
 
-        return left_alignment, right_alignment
+                print H
 
-    def alignment_score(self,l,r,match_score=3,mismatch_score=-1, gap_start=-2, gap_extend = -.5):
+                sys.exit(0)
+
+        align_index['left_start'] = i
+        align_index['right_start'] = j
+
+        # self.alignments.append((score, left_alignment, right_alignment))
+
+        return left_alignment, right_alignment, score, align_index
+
+    def alignment_score(self,l,r):
         score = 0
         prev_gap = 0 #was previous symbol gap
         for i in range(len(l)):
             if l[i] == '-' or r[i] == '-':
                 if prev_gap == 0:
                     prev_gap = 1
-                    score += gap_start + gap_extend
+                    score += self.gap_start + self.gap_extend
                 else:
-                    score += gap_extend
+                    score += self.gap_extend
             elif l[i] == r[i]:
-                score += match_score
+                score += self.match_score
                 prev_gap = 0
             else:
-                score += mismatch_score
+                score += self.mismatch_score
                 prev_gap = 0
 
         return score
@@ -414,7 +454,7 @@ def seqToAlign(a, b, matchScore = 3, mismatchScore = -1, gapScore = -2):
     return [(a.score, list(a.first), list(a.second)) for a in alignments]
 
 #testing functions
-def create_test_cases():
+def create_doc_test_cases():
     #tests
     t1 = ['a']*100
     t2 = ['b']*50 + ['a','a','b']*50
@@ -433,13 +473,13 @@ def create_test_cases():
     return tests
 
 
-#LocalAlignment algorithm tests
-def unit_tests():
+#LocalAligner algorithm tests
+def LocalAligner_unit_tests():
     
     def test_alignment(t1,t2):
-        f = LocalAlignment(t1,t2)
-        alignments=f.align() #default score is 3,-1,-2
-        score, l, r  = alignments[0]
+        f = LocalAligner()
+        alignment=f.align(t1,t2) #default score is 3,-1,-2
+        score, l, r  = alignment.alignments[0]
 
         #find score of recovered alignment
         align_score = f.alignment_score(l,r)
@@ -455,15 +495,15 @@ def unit_tests():
             print 'package_score: ' + str(alignments[0][0])
 
     #tests
-    tests = create_test_cases()
+    tests = create_doc_test_cases()
     for test in tests:
         z1, z2 = test
         test_alignment(z1,z2)
 
-        f = LocalAlignment(z1,z2)
-        alignments=f.align() #default score is 3,-1,-2
+        f = LocalAligner()
+        alignment=f.align(z1,z2) #default score is 3,-1,-2
 
-        score, l, r  = alignments[0]
+        score, l, r  = alignment.alignments[0]
 
         #run package algorithm
         alignments = seqToAlign(z1,z2) #default score is 3,-1,-2
@@ -485,7 +525,35 @@ def unit_tests():
                 print 'not same sequence'
                 break
 
-def speed_test():
+
+def test_alignment(t1,t2, algorithm):
+    f = algorithm()
+    alignment=f.align(t1,t2) #default score is 3,-1,-2
+    score, l, r  = alignment.alignments[0]
+
+    #find score of recovered alignment
+    align_score = f.alignment_score(l,r)
+
+    if score == align_score:
+        print 'backtraced alignment and alignmnet matrix consistent'
+    else:
+        print 'backtraced alignment and alignmnet matrix not consistent'
+        print 'dp_alg_score: ' + str(score)
+        print 'alignment_score: ' + str(align_score)
+
+        print 'left_alignment: ', l 
+        print 'right_alignment: ', r
+
+
+def generic_doc_unit_test(algorithm):
+
+    tests = create_doc_test_cases()
+    for test in tests:
+        z1, z2 = test
+        test_alignment(z1,z2, algorithm)
+
+
+def LocalAligner_speed_test():
     
     input_sizes = [np.exp2(p) for p in range(2,7)]
 
@@ -497,10 +565,10 @@ def speed_test():
         v2 = np.random.randint(0,10,input_size)
         our_times = []
         package_times = []
+        f = LocalAligner()
         for i in range(2):
             t1 = time.time()
-            f = LocalAlignment(v1,v2)
-            f.align()
+            f.align(v1,v2)
             our_times.append(time.time()-t1)
             
             t2 = time.time()
@@ -518,9 +586,43 @@ def speed_test():
     plt.show()
 
 
+def generic_doc_speed_test(algorithm):
+    
+    input_sizes = [np.exp2(p) for p in range(2,7)]
+
+    average_our_times = []
+    average_package_times = []
+    for input_size in input_sizes:
+        print input_size
+        v1 = np.random.randint(0,10,input_size)
+        v2 = np.random.randint(0,10,input_size)
+        our_times = []
+        package_times = []
+        f = LocalAligner()
+        g = algorithm()
+        for i in range(2):
+            t1 = time.time()
+            f.align(v1,v2)
+            our_times.append(time.time()-t1)
+            
+            t2 = time.time()
+            g.align(v1,v2)
+            package_times.append(time.time()-t2)
+    
+        average_our_times.append(np.mean(our_times))
+        average_package_times.append(np.mean(package_times))
+    
+    plt.plot(input_sizes,average_section_times, color = 'b', label = 'local alignment')
+    plt.plot(input_sizes,average_local_times, color='r', label = '{0} local alignment'.format(g._algorithm_name))
+    plt.legend(loc='upper right')
+    plt.xlabel('input size')
+    plt.ylim(0,0.02)
+    plt.show()
+
+
 #SectionLocalAlignment Tests
 def create_section_tests():
-    tests = create_test_cases()
+    tests = create_doc_test_cases()
 
     #convert tests into sections so 
     #that it makes sense for case
@@ -533,11 +635,11 @@ def create_section_tests():
     return left_test, right_test
 
 
-def section_unit_tests():
+def section_unit_tests(Algorithm):
     left_test, right_test = create_section_tests()
 
-    f = SectionLocalAlignment(left_test,right_test)
-    f.align()
+    f = Algorithm()
+    f.align(left_test,right_test)
 
     good_job = True
     for score, left, right in f.alignments:
@@ -572,13 +674,13 @@ def section_speed_test():
         section_times = []
         for i in range(2):
             t1 = time.time()
-            f = LocalAlignment(v1,v2)
-            f.align()
+            f = LocalAligner()
+            f.align(v1,v2)
             local_times.append(time.time()-t1)
 
             t2 = time.time()
-            f = SectionLocalAlignment(w1,v2)
-            f.align()
+            f = SectionLocalAligner()
+            f.align(w1,v2)
             section_times.append(time.time()-t2)
     
         average_local_times.append(np.mean(local_times))
@@ -592,10 +694,11 @@ def section_speed_test():
     plt.show()
 
 
-def test_alignment_indices():
+def section_test_alignment_indices():
     left_test, right_test = create_section_tests()
 
-    f = SectionLocalAlignment(left_test, right_test)
+    f = SectionLocalAligner()
+    f.align(left_test, right_test)
 
     good_job = True
     for i in range(len(f.alignments)):
@@ -615,6 +718,7 @@ def test_alignment_indices():
 
     if good_job:
         print 'indices worked'
+
 
 ############################################################
 ##helper functions
@@ -640,21 +744,26 @@ def clean_alignment(alignment):
 
 
 if __name__ == '__main__':
-    # print "running unit tests...."
-    # unit_tests()
+    # print "running LocalAligner unit tests.... \n"
+    # LocalAligner_unit_tests()
 
-    # print "running speed test...."
-    # speed_test()
+    # print "running LocalAligner speed tests.... \n"
+    # LocalAligner_speed_test()
 
-    print "running section_unit_tests"
+    print "running AffineLocalAligner unit tests.... \n"
+    generic_doc_unit_test(AffineLocalAligner)
+
+    print "running AffineLocalAligner speed tests.... \n"
+    generic_doc_speed_test(AffineLocalAligner)
+
+    print "running section unit tests.... \n"
     section_unit_tests()
 
-    print "running section_speed_test"
+    print "running section speed tests.... \n"
     section_speed_test()
 
-    print 'running test_alignment_indices'
-    test_alignment_indices()
-
+    print 'running test on keeping track of indices for section algorithm..... \n'
+    section_test_alignment_indices()
 
 
 
