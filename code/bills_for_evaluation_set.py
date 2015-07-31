@@ -38,15 +38,6 @@ def create_bills(ls):
             bill_id += 1
         k += 1
 
-    try:
-        for bill in bills.keys():
-            if bills[bill] == {} or bills[bill]['text'] == '' \
-                or bills[bill]['text'] == None:
-                
-                del bills[bill]
-    except:
-        pass
-
     #get more evaluation bills
     eval_bills = grab_more_eval_bills()
     for more_bills in eval_bills:
@@ -59,6 +50,14 @@ def create_bills(ls):
             bills[bill_id]['state'] = state  
             bills[bill_id]['match'] = k
 
+    try:
+        for bill in bills.keys():
+            if bills[bill] == {} or bills[bill]['text'] == '' \
+                or bills[bill]['text'] == None:
+                
+                del bills[bill]
+    except:
+        pass
 
     return bills
 
