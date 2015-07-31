@@ -41,8 +41,10 @@ class Alignment(object):
             
             score = u"{:.2f}".format(alignment[0])
             l = u" ".join(alignment[1])
+            l = "--------------LEFT TEXT--------------\n{0}\n------------------LEFT TEXT------------------".format(l)
             r = u" ".join(alignment[2])
-            content = u"{0}\n{1}\n{2}".format(score,l,r)
+            r = "--------------RIGHT TEXT--------------\n{0}\n-----------------RIGHT TEXT-----------------".format(r)
+            content = u"score: {0}\n\n{1}\n{2}".format(score,l,r)
             output_string = u"{0}{1}{2}".format(output_string,line_breaker,content)
         
         return output_string
@@ -115,7 +117,6 @@ class LocalAligner(Aligner):
         
         alignments = []
         alignment_indices = []
-
         a_ints, b_ints, word_map = self._transform_text(left, right)
         score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, self.match_score,
                 self.mismatch_score, self.gap_score)
