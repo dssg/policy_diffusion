@@ -21,9 +21,10 @@ $('.hidden-text-btn').click(function() {
 
 
 <script>
-function moveText(resultText)
+function moveText(leftText,rightText)
 {
-document.getElementById("result").innerHTML=resultText;
+document.getElementById("left_text").innerHTML=leftText;
+document.getElementById("right_text").innerHTML=rightText;
 }
 </script>
 
@@ -76,7 +77,7 @@ document.getElementById("result").innerHTML=resultText;
 <div class="container">
 
     <div class="page-header">
-        <h1>Search Interface v 0.2</h1>
+        <h1> LID  </h1>
     </div>
 
 
@@ -84,10 +85,6 @@ document.getElementById("result").innerHTML=resultText;
 
     <form method="get" action="searchdemo">
         <input type="text" value="type query here" name="query_string" /><br>
-        <input type="radio" name="result_type" value="raw_text" checked>return text
-        <br>
-        <input type="radio" name="result_type" value="alignment">return alignment
-        <br>
         <button type="submit">search</button>
     </form> 
     
@@ -95,15 +92,15 @@ document.getElementById("result").innerHTML=resultText;
 
 
 
-
-    <div class="span3">
-        <h2>Matching Bills</h2>
-        <table cellspacing="10">
-            {% for row in evaluation_data %}
+    <h2>Matching Bills</h2>
+            <div class="span3">
+            <table cellspacing="10">
+            <tr><td><b>Score</b></td><td><b>Bill Id</b></td></tr>
+                        {% for row in query_results %}
             <tr><td>{{ row.2 }}</td>
-                <td>{{ row.1 }}</td>
-                <td><input type="button" value="view" matt_val = "{{row.0}}"
-                    name="no" onclick="moveText(this.getAttribute('matt_val'))"></td>
+                <td>{{ row.3 }}</td>
+                <td><input type="button" value="view" left_val = "{{row.0}}" right_val = "{{row.1}}"
+                    name="no" onclick="moveText(this.getAttribute('left_val'),this.getAttribute('right_val'))"></td>
                 
             </tr>
             <tr><td><br><td>  </tr>
@@ -112,9 +109,23 @@ document.getElementById("result").innerHTML=resultText;
 
     </div>
         <br> <br>  <br>            
-    <div class="row">
-        <div class="col-md-8"><pre>{{query_string}}</pre></div> 
-            <div class="col-md-8" ><pre id = "result"></pre></div>
-    </div>
+   
+
+    <br> <br>  <br>            
+        
+        <div class="col-md-6"><div class="span5">
+                <pre id = "left_text"></pre>
+        </div></div>
+        
+
+        
+        
+        <div class="col-md-6" ><div class="span5"><pre id = "right_text"></pre></div></div>
+    
+
+
+
+
+
     </body>
     </html>

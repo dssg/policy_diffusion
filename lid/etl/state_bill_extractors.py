@@ -1,7 +1,7 @@
 from __future__ import division
 import lxml.html
 import urllib2
-from SunlightTextUtils import pdfdata_to_text, text_after_line_numbers, worddata_to_text
+from utils.sunlight_utils import pdfdata_to_text, text_after_line_numbers, worddata_to_text
 import urllib2
 import ujson
 import lxml.html

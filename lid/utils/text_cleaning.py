@@ -6,8 +6,6 @@ import elasticsearch
 import re
 import string
 import urllib2
-from tika import parser
-from collections import defaultdict
 from elasticsearch import Elasticsearch
 from pprint import pprint
 import nltk
@@ -15,7 +13,7 @@ import nltk
 #custom modules
 from database import ElasticConnection
 
-def clean_text(text, lower = 1):
+def clean_text(text, lower = True):
     '''
     variables:
         text: string corresponding to text of bill
@@ -26,12 +24,12 @@ def clean_text(text, lower = 1):
     decription:
         clean text 
     '''
+    #make text lowercase
+    if lower == True:
+        text = text.lower()
+    
     #parse by line
     text_list =  text.splitlines()
-
-    #make text lowercase
-    if lower == 1:
-        text_list = [text.lower() for text in text_list]
 
     #replace funky symbols and multipe new lines
     ntext_list = []
@@ -51,14 +49,7 @@ def clean_text(text, lower = 1):
  
  
 
-#Get data from elasticsearch to test
-es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
 
-def test_clean_text(state):
-   match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
-   state_text = match['hits']['hits'][3]['_source']['bill_document_first']
-   cleantext = clean_text(state_text)
-   return cleantext
    
 
 def split_to_sections(cleantext,state):
@@ -155,6 +146,7 @@ def delete_numbers_in_lines (chunked_list):
     return chunked_list
 
 
+
 #Delete multiple new lines for each section
 def delete_lines (chunked_list):
     '''
@@ -164,43 +156,40 @@ def delete_lines (chunked_list):
     return chunked_list
         
 
-def clean_text_for_query(bill_text,state):
-    bill_text = clean_text(bill_text)
-    bill_text_sections = split_to_sections(bill_text,state)
-    bill_text_sections = delete_empty_sections(bill_text_sections)
 
-    if state in ['or','ok','ne','pa']:
-        bill_text_sections = delete_numbers_in_lines(bill_text_sections)
+def clean_document(doc_text,doc_type = "text",split_to_section = False,**kwargs):
+    """text -- document text
+       doc_type --- the type of the document ( "state_bill", "model_legislation", "None")    """
     
-    bill_text_sections = delete_lines(bill_text_sections)
-    return " ".join(bill_text_sections)
+    if doc_type == "state_bill" and "state_id" not in kwargs:
+        print "need to specify state_id"
+        exit()
 
 
-def clean_text_for_alignment(bill_text,state):
-    bill_text = clean_text(bill_text)
-    bill_text_sections = split_to_sections(bill_text,state)
-    bill_text_sections = delete_empty_sections(bill_text_sections)
-
-    if state in ['or','ok','ne','pa']:
-        bill_text_sections = delete_numbers_in_lines(bill_text_sections)
+    if doc_type == "state_bill":
+        doc_text = clean_text(doc_text)
+        doc_text_sections = split_to_sections(doc_text,kwargs['state_id'])
+        doc_text_sections = delete_empty_sections(doc_text_sections)
+        if kwargs['state_id'] in ['or','ok','ne','pa']:
+            doc_text_sections = delete_numbers_in_lines(doc_text_sections)
+        doc_text_sections = delete_lines(doc_text_sections)
     
-    bill_text_sections = delete_lines(bill_text_sections)
-
-    return bill_text_sections
-
-
-def test_clean_text_for_alignment(state):
-    match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
-    state_text = match['hits']['hits'][3]['_source']['bill_document_first']
-
-    return clean_text_for_alignment(state_text, state)
-
-def clean_text_for_model_legislation(bill_text):
-    cleantext = clean_text(bill_text)
-    bill_text_sections = cleantext.split('\nsection')
-    bill_text_sections = delete_empty_sections(bill_text_sections)
-    bill_text_sections = delete_lines(bill_text_sections)
-    return bill_text_sections
+    elif doc_type == "model_legislation":
+        doc_text = clean_text(doc_text)
+        doc_text_sections = doc_text.split('\nsection')
+        doc_text_sections = delete_empty_sections(doc_text_sections)
+        doc_text_sections = delete_lines(doc_text_sections)
+        
+    elif doc_type == "text":
+        doc_text = clean_text(doc_text)
+        doc_text_sections = doc_text.split('\n')
+        doc_text_sections = delete_empty_sections(doc_text_sections)
+        doc_text_sections = delete_lines(doc_text_sections)
+    
+    if split_to_section == True:
+        return doc_text_sections
+    elif split_to_section == False:
+        return " ".join(doc_text_sections)
 
 #delete boiler plate present in all alec exposed bills after "effective date"
 def delete_boiler_plate_alec_exposed (chunked_list):
@@ -209,3 +198,22 @@ def delete_boiler_plate_alec_exposed (chunked_list):
     return chunked_list
 
 #good example is test_clean_text_for_alignment('va')
+
+def test_clean_text(state):
+   es = Elasticsearch(['54.203.12.145:9200', '54.203.12.145:9200'], timeout=300)
+   match = es.search(index="state_bills", body={"query": {"match": {'state': state}}})
+   state_text = match['hits']['hits'][3]['_source']['bill_document_first']
+   cleaned_doc = clean_document(state_text,doc_type = "state_bill",state_id = "mi",split_to_section = False)
+   return cleaned_doc
+
+def main():
+    #Get data from elasticsearch to test
+    
+    print test_clean_text("mi")
+
+if __name__ == "__main__":
+    main()
+
+
+
+

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# make sure path to this project is set
+if [ ! -n "$POLICY_DIFFUSION" ]; then
+    echo "Error: \$POLICY_DIFFUSION environment variable is not set"
+    return
+fi
+
+# add python code to path
+export PYTHONPATH=${POLICY_DIFFUSION}/lid:${POLICY_DIFFUSION}
+export PYTHONPATH=${POLICY_DIFFUSION}/lid/etl:${POLICY_DIFFUSION}
+export PYTHONPATH=${POLICY_DIFFUSION}/lid/utils:${POLICY_DIFFUSION}
+export PYTHONPATH=${POLICY_DIFFUSION}/lid/evaluation:${POLICY_DIFFUSION}
+export PYTHONPATH=${POLICY_DIFFUSION}/scripts:${POLICY_DIFFUSION}

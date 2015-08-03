@@ -15,7 +15,7 @@ import numpy as np
 import logging
 import elasticsearch
 
-logging.getLogger('elasticsearch').setLevel(logging.ERROR)
+
 
 #Constants
 STATE_BILL_INDEX = "state_bills"
@@ -80,53 +80,8 @@ class ElasticConnection():
         return doc_ids
         
 
-    def query_state_bills_for_frontend(self,query,highlight = False):
+    def query_state_bills_for_frontend(self,query):
         
-        if highlight:
-            json_query = json.load(open("{0}/db/state_bill_query_with_highlights.json".format(
-                os.environ['POLICY_DIFFUSION'])))
-            json_query = json.load(open("{0}/db/state_bill_query_no_highlights.json".format(
-                os.environ['POLICY_DIFFUSION'])))
-            json_query['query']['match']['bill_document_last.shingles'] = query
-            results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query)
-            results = results['hits']['hits']
-            result_docs = []
-            for res in results:
-                doc = {}
-                doc['doc_text_with_highlights'] = res['highlight']['bill_document_last.shingles']
-                doc['doc_text'] = res['_source']['bill_document_last']
-                doc['score'] = res['_score']
-                doc['bill_id'] = res['_source']['unique_id']
-                doc['state'] = res['_source']['state']
-                doc['title'] = res['_source']['bill_title']
-                
-                result_docs.append(doc)
-
-            return result_docs
-
-        
-        else:
-            json_query = json.load(open("{0}/db/state_bill_query_no_highlights.json".format(
-                os.environ['POLICY_DIFFUSION'])))
-            json_query['query']['match']['bill_document_last.shingles'] = query
-            results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query)
-            results = results['hits']['hits']
-            result_docs = []
-            for res in results:
-                doc = {}
-                doc['doc_text'] = res['_source']['bill_document_last']
-                doc['score'] = res['_score']
-                doc['bill_id'] = res['_source']['unique_id']
-                doc['state'] = res['_source']['state']
-                doc['title'] = res['_source']['bill_title']
-                
-                result_docs.append(doc)
-
-            return result_docs
-
-    
-
-    def similar_doc_query(self,query,num_results = 1000):
         json_query = """ 
             {
                 "query": {
@@ -146,18 +101,61 @@ class ElasticConnection():
         json_query = json.loads(json_query)
         json_query['query']['more_like_this']['like_text'] = query            
         results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
-                fields = ["state"],
+                fields = ["state","bill_title","bill_id","bill_document_last"],
+                size = 100 )
+        results = results['hits']['hits']
+        result_docs = []
+        for res in results:
+            doc = {}
+            doc['text'] = res['fields']['bill_document_last'][0]
+            doc['title'] = res['fields']['bill_title'][0]
+            doc['bill_name'] = res['fields']['bill_id'][0]
+            doc['state'] = res["fields"]['state'][0]
+            doc['score'] = res['_score']
+            doc['id'] = res['_id']
+            result_docs.append(doc)
+        return result_docs
+
+    
+
+    def similar_doc_query(self,query,state_id = None,num_results = 1000,return_fields = ["state"]):
+        json_query = """ 
+            {
+                "query": {
+                    "more_like_this": {
+                        "fields": [
+                            "bill_document_last.shingles"
+                        ],
+                        "like_text": "",
+                        "max_query_terms": 25,
+                        "min_term_freq": 1,
+                        "min_doc_freq": 2,
+                        "minimum_should_match": 1
+                    }
+                }
+            }
+        """
+        json_query = json.loads(json_query)
+        json_query['query']['more_like_this']['like_text'] = query
+
+
+        results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
+                fields = return_fields,
                 size = num_results )
         results = results['hits']['hits']
         result_docs = []
         for res in results:
             doc = {}
-            doc['state'] = res["fields"]['state']
+            for f in res['fields']:
+                doc[f] = res['fields'][f][0]
+            #doc['state'] = res["fields"]['state'][0]
             doc['score'] = res['_score']
             doc['id'] = res['_id']
             
-            result_docs.append(doc)
-
+            #if applicable, only return docs that are from different states
+            if doc['state'] != state_id:
+                result_docs.append(doc)
+        
         return result_docs
 
 
