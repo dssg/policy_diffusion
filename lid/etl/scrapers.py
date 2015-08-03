@@ -204,24 +204,23 @@ def scrape_CSG_model_legislation():
         if link.has_attr('href'):
             candidate = link.attrs['href']
             # links with pdf extension tend to be model bills
-            if candidate[-4:] == ".pdf":  
+            if candidate[-4:] == ".pdf":
                 links.append(candidate)
 
     # only keeps distinct links
-    links = list(set(links))
+    links2 = list(set(links))
 
     badCount = 0
     goodCount = 0
-    source_list = []
+
     with open('csg_bills.json', 'w') as f:
-        for line in links:
+        for line in links2:
             try:
                 url_key = {}
                 source = urllib2.urlopen(line).read()
                 Jsonbill = bill_source_to_json(link, source, None)
                 f.write("{0}\n".format(Jsonbill))
                 goodCount += 1
-                source_list.append(source)
                 print goodCount
             except:
                 badCount += 1
