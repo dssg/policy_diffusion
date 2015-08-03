@@ -46,8 +46,10 @@ class Alignment(object):
             
             score = u"{:.2f}".format(alignment[0])
             l = u" ".join(alignment[1])
+            l = u"--------------LEFT TEXT--------------\n{0}\n------------------LEFT TEXT------------------".format(l)
             r = u" ".join(alignment[2])
-            content = u"{0}\n{1}\n{2}".format(score,l,r)
+            r = u"--------------RIGHT TEXT--------------\n{0}\n-----------------RIGHT TEXT-----------------".format(r)
+            content = u"score: {0}\n\n{1}\n{2}".format(score,l,r)
             output_string = u"{0}{1}{2}".format(output_string,line_breaker,content)
         
         return output_string
@@ -117,23 +119,59 @@ class LocalAligner(Aligner):
 
     def align(self,left,right):
         
-        
         alignments = []
         alignment_indices = []
-
+        
         a_ints, b_ints, word_map = self._transform_text(left, right)
-        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, self.match_score,
-                self.mismatch_score, self.gap_score)
+        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints,self.match_score,self.mismatch_score, self.gap_score)
         l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
         reverse_word_map = {v:k for k,v in word_map.items()}
         reverse_word_map["-"] = "-" 
         l = [reverse_word_map[w] for w in l]
         r = [reverse_word_map[w] for w in r]
-
+        
         alignment_indices.append(align_index)
         alignments.append((score, l, r))
-    
+        
+        return Alignment(left,right,alignments,alignment_indices)
+
+    def align_by_section(self,left_sections,right):
+        
+        alignments = []
+        alignment_indices = []
+
+        #keeps track of beginning index of section
+        #to recover correct indices of sections
+        section_start_index = 0
+
+        for left in left_sections:
+
+            a_ints, b_ints, word_map = self._transform_text(left, right)
+            score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, self.match_score,
+                    self.mismatch_score, self.gap_score)
+            l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
+
+            score = score_matrix.max()
+
+            reverse_word_map = {v:k for k,v in word_map.items()}
+            reverse_word_map["-"] = "-" 
+            l = [reverse_word_map[w] for w in l]
+            r = [reverse_word_map[w] for w in r]
+
+            alignments.append((score, l, r))
+            
+            #adjust for section
+            align_index['left_start'] += section_start_index
+            align_index['left_end'] += section_start_index
+            
+            alignment_indices.append(align_index)
+
+            #update section_start_index
+            section_start_index += len(left)
+        
+        left = reduce(lambda x,y:x+y,left_sections)
+
         return Alignment(left,right,alignments,alignment_indices)
 
     @jit
@@ -162,6 +200,8 @@ class LocalAligner(Aligner):
                 score_matrix[i,j] = scores[max_decision]
         
         return score_matrix, pointer_matrix
+
+
     @jit
     def _backtrace(self, left, right, score_matrix, pointer_matrix):
 
@@ -370,53 +410,32 @@ class AffineLocalAligner(LocalAligner):
 
         return score
 
-#aligns left and right text where left text is a list of sections
-class SectionLocalAligner(LocalAligner):
 
-    '''
-    Input:
-        List of lists where each list is a list of words in a section in the document 
 
-    Description:
-        Local Alignment that looks for alignments by section
-    '''
-    def align(self,left_sections,right):
-        
-        alignments = []
-        alignment_indices = []
-
-        #keeps track of beginning index of section
-        #to recover correct indices of sections
-        section_start_index = 0
-
-        for left in left_sections:
-
-            a_ints, b_ints, word_map = self._transform_text(left, right)
-            score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints, self.match_score,
-                    self.mismatch_score, self.gap_score)
-            l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
-
-            score = score_matrix.max()
-
-            reverse_word_map = {v:k for k,v in word_map.items()}
-            reverse_word_map["-"] = "-" 
-            l = [reverse_word_map[w] for w in l]
-            r = [reverse_word_map[w] for w in r]
-
-            alignments.append((score, l, r))
+@jit(nopython=True)
+def _optimized_compute_matrix(left, right,score_matrix,scores,pointer_matrix,
+        match_score, mismatch_score, gap_score):
+    
+    m = len(left) + 1
+    n = len(right) + 1
+    for i in xrange(1, m):
+        for j in xrange(1, n):
             
-            #adjust for section
-            align_index['left_start'] += section_start_index
-            align_index['left_end'] += section_start_index
+            if left[i-1] == right[j-1]:
+                scores[1] = score_matrix[i-1,j-1] + match_score
+            else:
+                scores[1] = score_matrix[i-1,j-1] + mismatch_score
+
+            scores[2] = score_matrix[i, j - 1] + gap_score
             
-            alignment_indices.append(align_index)
+            scores[3] = score_matrix[i - 1, j] + gap_score
+    
+            max_decision = np.argmax(scores)
 
-            #update section_start_index
-            section_start_index += len(left)
-        
-        left = reduce(lambda x,y:x+y,left_sections)
-
-        return Alignment(left,right,alignments,alignment_indices)
+            pointer_matrix[i,j] = max_decision
+            score_matrix[i,j] = scores[max_decision]
+    
+    return score_matrix, pointer_matrix
 
 
 
