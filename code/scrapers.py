@@ -190,7 +190,7 @@ def scrape_alec_exposed_bills ():
         date = '2010-2013'
         print name
         print source
-        Jsonbill = bill_source_to_json(url, source, source)
+        Jsonbill = bill_source_to_json_not_encoded(url, source, date)
         f2.write("{0}\n".format(Jsonbill))
 
 
@@ -208,18 +208,20 @@ def scrape_CSG_model_legislation():
                 links.append(candidate)
 
     # only keeps distinct links
-    inks = list(set(links))
+    links = list(set(links))
 
     badCount = 0
     goodCount = 0
-    with open('alice_bills.json', 'w') as f:
-        for link in links:
+    source_list = []
+    with open('csg_bills.json', 'w') as f:
+        for line in links:
             try:
                 url_key = {}
-                source = urllib2.urlopen(link).read()
+                source = urllib2.urlopen(line).read()
                 Jsonbill = bill_source_to_json(link, source, None)
                 f.write("{0}\n".format(Jsonbill))
                 goodCount += 1
+                source_list.append(source)
                 print goodCount
             except:
                 badCount += 1
@@ -258,7 +260,7 @@ def scrape_ALICE_legislation():
 
     badCount = 0
     goodCount = 0
-    with open('csg_bills.json', 'w') as f:
+    with open('alice_bills.json', 'w') as f:
         for link in billList:
             # url_key = {}
             # source = urllib2.urlopen(link).read()
