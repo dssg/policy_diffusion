@@ -18,7 +18,7 @@ import re
 import nltk
 
 
-env = Environment(loader=FileSystemLoader('/Users/mattburg/Dropbox/dssg/policy_diffusion/html/templates'))
+env = Environment(loader=FileSystemLoader('/Users/eugeniagiraudy/Dropbox/DSSG/policy_diffusion/html/templates'))
 
 EVALUATION_DATA = json.load(open("../data/eval.json")).values()
 EVALUATION_DATA = [[d['url'],d['text'],d['match'],i] for i,d in enumerate(EVALUATION_DATA) if len(d.values()) > 0]
@@ -61,7 +61,7 @@ class DemoWebserver(object):
 
     _cp_config = {
        'tools.staticdir.on' : True,
-       'tools.staticdir.dir' : '/Users/mattburg/Dropbox/dssg/policy_diffusion/html',
+       'tools.staticdir.dir' : '/Users/eugeniagiraudy/Dropbox/DSSG/policy_diffusion/html',
        'tools.staticdir.index' : 'index.html',
        'tools.sessions.on': True,
     }
