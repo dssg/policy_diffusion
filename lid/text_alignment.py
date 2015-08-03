@@ -277,11 +277,11 @@ class AffineLocalAligner(LocalAligner):
         alignment_indices = []
 
         a_ints, b_ints, word_map = self._transform_text(left, right)
-        H, pointer_matrix = self._compute_matrix(a_ints, b_ints, 
+        H, F, E = self._compute_matrix(a_ints, b_ints, 
                                         self.match_score, self.mismatch_score, 
                                         self.gap_start, self.gap_extend)
         
-        l, r, score, align_index = self._backtrace(a_ints, b_ints, H , pointer_matrix, self.match_score, self.mismatch_score, 
+        l, r, score, align_index = self._backtrace(a_ints, b_ints, H , F, E, self.match_score, self.mismatch_score, 
                                         self.gap_start, self.gap_extend)
 
         score = H.max()
@@ -304,10 +304,11 @@ class AffineLocalAligner(LocalAligner):
         H = np.zeros((m, n), float) #best match ending at i,j
         F = np.zeros((m, n), float) #best ending in space in X
         E = np.zeros((m, n), float) #best ending in space in Y
-        pointer_matrix = np.zeros((m,n), int)
+        # pointer_matrix = np.zeros((m,n), int)
 
         H[0,0] = 0
         for i in range(1,m):
+
             score = gap_start + i*gap_extend
             H[i,0] = score
             E[i,0] = score
@@ -322,21 +323,17 @@ class AffineLocalAligner(LocalAligner):
                 E[i,j] = max(E[i,j-1]+gap_extend, H[i,j-1] + gap_start + gap_extend)
 
                 if left[i-1] == right[j-1]:
-                    scores = np.array([0,  H[i-1,j-1]+match_score, F[i,j], E[i,j]])
-                    H[i,j] = max(scores)
-                    max_decision = np.argmax(scores)
+                    H[i,j] = max(np.array([0,  H[i-1,j-1]+match_score, F[i,j], E[i,j]]))
                 else:
-                    scores = np.array([0,  H[i-1,j-1]+mismatch_score, F[i,j], E[i,j]])
-                    H[i,j] = max(scores)
-                    max_decision = np.argmax(scores)
+                    H[i,j] = max(np.array([0,  H[i-1,j-1]+mismatch_score, F[i,j], E[i,j]]))
 
-                pointer_matrix[i,j] = max_decision        
+                # pointer_matrix[i,j] = max_decision        
         
-        return H, pointer_matrix
+        return H, F, E
 
 
     @jit
-    def _backtrace(self, left, right, H, pointer_matrix, match_score,
+    def _backtrace(self, left, right, H, F, E, match_score,
                  mismatch_score, gap_start, gap_extend):
 
         i,j = np.unravel_index(H.argmax(), H.shape)
@@ -349,40 +346,97 @@ class AffineLocalAligner(LocalAligner):
         align_index['right_end'] = j
 
         #to get multiple maxs, just set score_matrix.argmax() to zero and keep applying argmax for as many as you want
-        decision = pointer_matrix[i,j]
+        # decision = pointer_matrix[i,j]
 
         left_alignment = []
         right_alignment = []
         while H[i,j] != 0:
+
+            #determine whether to insert gaps and how many
+            #left gaps
+            if H[i,j] == E[i,j]:
+                while E[i,j] == E[i, j-1] + gap_extend:
+                    j -= 1
+                    right_alignment = [right[j]] + right_alignment
+                    left_alignment = ['-'] + left_alignment        
+        
+                j -= 1
+                right_alignment = [right[j]] + right_alignment
+                left_alignment = ['-'] + left_alignment
+
+            #right gaps
+            if H[i,j] == F[i,j]:
+                while F[i,j] == F[i-1,j] + gap_extend:
+                    i -= 1
+                    left_alignment = [left[i]] + left_alignment
+                    right_alignment = ['-'] + right_alignment
+
+                i -= 1
+                left_alignment = [left[i]] + left_alignment
+                right_alignment = ['-'] + right_alignment
+
+            #determine whether it is a match or mismatch
             if left[i-1] == right[j-1]:
                 score = match_score
             else:
                 score = mismatch_score
-            if H[i,j] == H[i-1,j-1] + score: #do not insert space
+
+            #do not insert gap
+            if H[i,j] == H[i-1,j-1] + score: 
                 i -= 1
                 j -= 1
                 left_alignment = [left[i]] + left_alignment
-                right_alignment = [right[j]] + right_alignment
-            elif H[i,j] == H[i,j-1] + gap_start + gap_extend: #insert space in left text
-                j -= 1
-                right_alignment = [right[j]] + right_alignment
-                left_alignment = ['-'] + left_alignment
-            elif H[i,j] == H[i-1,j] + gap_start + gap_extend: #insert space in left text
-                i -= 1
-                left_alignment = [left[i]] + left_alignment
-                right_alignment = ['-'] + right_alignment
-            else:
-                print "backtrace did not work properly; there is an error \n"
+                right_alignment = [right[j]] + right_alignment                                                           
 
-                print "i,j: ", i,j
-                print "H[i,j]: ", H[i,j]
-                print "H[i,j-1] + gap_start + gap_extend: ", H[i,j-1] + gap_start + gap_extend
-                print "H[j-1, i] + gap_start + gap_extend: ", H[j-1, i] + gap_start + gap_extend
-                print "H[i-1,j-1] + score: ", H[i-1,j-1] + score
+                # if H[i,j] == H[i-1,j-1] + score: #do not insert space
+                #     i -= 1
+                #     j -= 1
+                #     left_alignment = [left[i]] + left_alignment
+                #     right_alignment = [right[j]] + right_alignment
+                # elif H[i,j] == E[i,j]: #insert space in left text
+                #     j -= 1
+                #     right_alignment = [right[j]] + right_alignment
+                #     left_alignment = ['-'] + left_alignment
+                # elif H[i,j] == F[i,j]: #insert space in left text
+                #     i -= 1
+                #     left_alignment = [left[i]] + left_alignment
+                #     right_alignment = ['-'] + right_alignment
+                # else:
+                #     print "backtrace did not work properly; there is an e
 
-                print H
 
-                sys.exit(0)
+        # left_alignment = []
+        # right_alignment = []
+        # while H[i,j] != 0:
+        #     if left[i-1] == right[j-1]:
+        #         score = match_score
+        #     else:
+        #         score = mismatch_score
+        #     if H[i,j] == H[i-1,j-1] + score: #do not insert space
+        #         i -= 1
+        #         j -= 1
+        #         left_alignment = [left[i]] + left_alignment
+        #         right_alignment = [right[j]] + right_alignment
+        #     elif H[i,j] == E[i,j]: #insert space in left text
+        #         j -= 1
+        #         right_alignment = [right[j]] + right_alignment
+        #         left_alignment = ['-'] + left_alignment
+        #     elif H[i,j] == F[i,j]: #insert space in left text
+        #         i -= 1
+        #         left_alignment = [left[i]] + left_alignment
+        #         right_alignment = ['-'] + right_alignment
+        #     else:
+        #         print "backtrace did not work properly; there is an error \n"
+
+                # print "i,j: ", i,j
+                # print "H[i,j]: ", H[i,j]
+                # print "H[i,j-1] + gap_start + gap_extend: ", H[i,j-1] + gap_start + gap_extend
+                # print "H[j-1, i] + gap_start + gap_extend: ", H[j-1, i] + gap_start + gap_extend
+                # print "H[i-1,j-1] + score: ", H[i-1,j-1] + score
+
+                # print H
+
+                # sys.exit(0)
 
         align_index['left_start'] = i
         align_index['right_start'] = j
@@ -486,7 +540,12 @@ def create_doc_test_cases():
     w1 = np.array([7, 6, 3, 2, 1, 3, 0, 1, 2, 3, 4])
     w2  = np.array([4, 5, 2, 1, 2, 2, 0, 1, 2, 3, 4])
 
-    tests = [(t1,t2), (s1,s2),(v1,v2), (w1,w2), (np.random.choice(5, 30),np.random.choice(5, 30))]
+    tests = [(t1,t2), (s1,s2),(v1,v2), (w1,w2), (np.random.choice(5, 30),np.random.choice(5, 30)), \
+    (np.array([1, 2, 0, 0, 1, 2, 3, 0, 1, 3, 0, 4, 3, 3, 0, 3, 0, 2, 0, 4, 3, 4, 2, \
+       1, 1, 1, 1, 1, 0, 1]), np.array([2, 0, 3, 1, 2, 4, 0, 1, 3, 0, 1, 4, 1, 3, 1, 4, 0, 0, 1, 2, 4, 0, 0, \
+       2, 4, 1, 3, 2, 2, 4]))]
+
+    # print tests
 
     return tests
 
@@ -605,11 +664,14 @@ def LocalAligner_speed_test():
 
 
 def generic_doc_speed_test(algorithm):
+    '''
+    compares speed of algorithm to local alignment algorithm
+    '''
     
     input_sizes = [np.exp2(p) for p in range(2,7)]
 
-    average_our_times = []
-    average_package_times = []
+    average_alg_times = []
+    average_local_times = []
     for input_size in input_sizes:
         print input_size
         v1 = np.random.randint(0,10,input_size)
@@ -621,17 +683,17 @@ def generic_doc_speed_test(algorithm):
         for i in range(2):
             t1 = time.time()
             f.align(v1,v2)
-            our_times.append(time.time()-t1)
+            average_local_times.append(time.time()-t1)
             
             t2 = time.time()
             g.align(v1,v2)
-            package_times.append(time.time()-t2)
+            average_alg_times.append(time.time()-t2)
     
-        average_our_times.append(np.mean(our_times))
-        average_package_times.append(np.mean(package_times))
+        average_alg_times.append(np.mean(our_times))
+        average_local_times.append(np.mean(package_times))
     
-    plt.plot(input_sizes,average_section_times, color = 'b', label = 'local alignment')
-    plt.plot(input_sizes,average_local_times, color='r', label = '{0} local alignment'.format(g._algorithm_name))
+    plt.plot(input_sizes,average_local_times, color = 'b', label = 'local alignment')
+    plt.plot(input_sizes,average_alg_times, color='r', label = '{0} local alignment'.format(g._algorithm_name))
     plt.legend(loc='upper right')
     plt.xlabel('input size')
     plt.ylim(0,0.02)
@@ -760,7 +822,6 @@ def clean_alignment(alignment):
     return (keep1, keep2)
 
 
-
 if __name__ == '__main__':
     # print "running LocalAligner unit tests.... \n"
     # LocalAligner_unit_tests()
@@ -774,14 +835,14 @@ if __name__ == '__main__':
     print "running AffineLocalAligner speed tests.... \n"
     generic_doc_speed_test(AffineLocalAligner)
 
-    print "running section unit tests.... \n"
-    section_unit_tests()
+    # print "running section unit tests.... \n"
+    # section_unit_tests()
 
-    print "running section speed tests.... \n"
-    section_speed_test()
+    # print "running section speed tests.... \n"
+    # section_speed_test()
 
-    print 'running test on keeping track of indices for section algorithm..... \n'
-    section_test_alignment_indices()
+    # print 'running test on keeping track of indices for section algorithm..... \n'
+    # section_test_alignment_indices()
 
 
 
