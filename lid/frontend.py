@@ -5,7 +5,6 @@ import argparse
 import datetime as dt
 import time
 from collections import defaultdict
-from fast_alignment import LocalAligner
 import cherrypy
 from jinja2 import Environment, FileSystemLoader
 import random
@@ -15,23 +14,14 @@ from elasticsearch import Elasticsearch
 from database import ElasticConnection
 import re
 import nltk
-from CleanText import clean_text_for_query
-from LID import LID
-
+from utils.text_cleaning import clean_document
+from lid import LID
+from utils.utils import alignment_tokenizer
+from text_alignment import LocalAligner
 
 env = Environment(loader=FileSystemLoader('/Users/mattburg/Dropbox/dssg/policy_diffusion/html/templates'))
 
-#EVALUATION_DATA = json.load(open("../data/eval.json")).values()
-#EVALUATION_DATA = [[d['url'],d['text'],d['match'],i] for i,d in enumerate(EVALUATION_DATA) if len(d.values()) > 0]
-#EVALUATION_DATA.sort(key = lambda x:x[2])
-
-#for d in EVALUATION_DATA:
-#    d[0] = "/".join(d[0].split("/")[0:4])
-#    text = d[1]
-#    text = re.sub("\n+","\n",text)
-#    text = re.sub('\"',' ',text)
-#    d[1] = text
-
+query_samples = [x.strip() for x in open("/Users/mattburg/Dropbox/dssg/policy_diffusion/data/state_bill_samples.txt")]
 
 
 def get_alignment_highlight(text1,text2):
@@ -54,7 +44,31 @@ def get_alignment_highlight(text1,text2):
 
     
 
-
+def markup_alignment(l,r):
+    l_styled = []
+    r_styled = []
+    temp_text = ""
+    for i in range(len(l)):
+        if l[i] == r[i] and l[i] != "-":
+            temp_text+=l[i]
+            temp_text+=" "
+        if l[i] != r[i]:
+            if len(temp_text)>0:
+                temp_text = u"<mark>{0}</mark>".format(temp_text) 
+                l_styled.append(temp_text)
+                r_styled.append(temp_text)
+                temp_text = ""
+            if l[i] != "-" and r[i] != "-":
+                l_styled.append(u"<b>{0}</b>".format(l[i]))
+                r_styled.append(u"<b>{0}</b>".format(r[i]))
+            else:
+                l_styled.append(l[i])
+                r_styled.append(r[i])
+    
+    temp_text = u"<mark>{0}</mark>".format(temp_text) 
+    l_styled.append(temp_text)
+    r_styled.append(temp_text)
+    return l_styled,r_styled
 
 
 class DemoWebserver(object):
@@ -71,13 +85,85 @@ class DemoWebserver(object):
 
     def __init__(self,elastic_connection):
         self.ec = elastic_connection
+        self.lidy = LID(elastic_host = "54.203.12.145",query_results_limit=100)
+        self.aligner = LocalAligner()
+        self.query_bill = "bill"
 
 
     @cherrypy.expose
-    def searchdemo(self, query_string="this is a test"):
+    def evaluation(self,query_bill = "ga_2011_12_HB1101",alignment_index = 0):
 
+        query_string = self.ec.get_bill_by_id(query_bill)['bill_document_last']
+        if query_string is None:
+            tmpl = env.get_template('evaluation.html')
+            c = {
+                    'query_bill':query_bill,
+                    'display_results': [],
+                    'query_samples': query_samples,
+                    'search_results': [],
+                    'indices':range(100),
+                    'alignment_index':alignment_index,
+                    'align_bill':query_bill,
+                    'query_display':query_display,
+                    'align_display':align_display
+            }
+            return tmpl.render(**c)
+
+        
+        
+        query_sections = clean_document(query_string,doc_type = "state_bill",split_to_section = True,
+                state_id = query_bill.split("_")[0])
+        query_display = "\n\n".join(query_sections)
+        
+        if query_bill == self.query_bill:
+            result_docs = self.result_docs
+        else:
+            result_docs = self.ec.similar_doc_query(" ".join(query_sections),num_results = 100,
+                    return_fields = ["state","bill_document_last"])
+            self.query_bill = query_bill
+            self.result_docs = result_docs
+        
+        query_results = [[x['id'],x['score'],i] for i,x in enumerate(result_docs)]
+        
+        alignment_index = int(alignment_index)
+        align_bill = result_docs[alignment_index]['id']
+
+        alignment_doc = result_docs[alignment_index]
+        res_sequence = clean_document(alignment_doc['bill_document_last'],state_id = alignment_doc['state'])
+        align_display = res_sequence
+
+        res_sequence = alignment_tokenizer(res_sequence)
+        left_doc = [alignment_tokenizer(s) for s in query_sections]
+        alignments,indices = self.aligner.align_by_section(left_doc,res_sequence)
+        display_results = []
+        
+        for s,l,r in alignments:
+            
+            l,r = markup_alignment(l,r)
+            l = " ".join(l)
+            r = " ".join(r)
+            display_results.append([l,r,s])
+        
+        indices = [str(x) for x in range(100)]
+        tmpl = env.get_template('evaluation.html')
+        c = {
+                'query_bill':query_bill,
+                'display_results': display_results,
+                'query_samples': query_samples,
+                'search_results': query_results,
+                'indices':indices,
+                'alignment_index':alignment_index,
+                'align_bill': align_bill,
+                'query_display':query_display,
+                'align_display':align_display
+        }
+        return tmpl.render(**c)
+
+    
+    @cherrypy.expose
+    def searchdemo(self, evaluation_data = None,left_doc_id = None,right_doc_id = None ):
+        
         query_string =  re.sub('\"',' ',query_string)
-
                 
         query_string = clean_text_for_query(query_string,state = None)
         query_results = self.ec.query_state_bills_for_frontend(query_string)
@@ -152,6 +238,7 @@ class DemoWebserver(object):
                 'query_results': alignment_results,
         }
         return tmpl.render(**c)
+    
 
 
     @cherrypy.expose

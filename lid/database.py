@@ -118,7 +118,7 @@ class ElasticConnection():
 
     
 
-    def similar_doc_query(self,query,state_id = None,num_results = 1000,return_fields = ["state"]):
+    def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"]):
         json_query = """ 
             {
                 "query": {
@@ -190,32 +190,28 @@ class ElasticConnection():
 
 
 
-
     def get_bills_by_state(self, state, num_bills = 'all', step = 3000):
-        es = self.es_connection
-
-        if num_bills != 'all':
-            bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
-            total = bills['hits']['total']
-        else:
-            total = num_bills
+        query_string = '''{
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "term": {
+                        "bill_document.state": ""
+                      }
+                    }
+                  ]
+                }
+              }
+            }'''
+        json_query = json.loads(query_string)
+        json_query['query']['bool']['must'][0]["term"]["bill_document.state"] = state
+        results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
+                fields = [],
+                size = 100000 )
         
-        #fix as above
-        body_gen = lambda start, size: '{"from" :' + str(start)  + ', "size" : ' + str(size) +  ',"query":{"term":{"bill_document.state":"' + state+ '"}}}'
-
-
-        all_bills = []
-        start = 0
-        bad_count = 0
-        while start <= total:
-            body = body_gen(start,step)                   
-            bills = es.search(index="state_bills", body=body)
-            bill_list = bills['hits']['hits']
-            all_bills.append(bill_list)
-
-            start +=  step
-
-        return all_bills
+        #returns ids of bill documents
+        return [x['_id'] for x in results['hits']['hits']]
 
 
 

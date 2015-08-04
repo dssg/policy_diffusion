@@ -20,22 +20,26 @@ import pandas as pd
 import random
 from compiler.ast import flatten
 from sklearn.decomposition import PCA
-from alignment.sequence import Sequence
-from alignment.vocabulary import Vocabulary
-from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
+#from alignment.sequence import Sequence
+#from alignment.vocabulary import Vocabulary
+#from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
 
 #TODO: use alignment algorithm
 #repsrents two aligned pieces of text
 class Alignment(object):
 
-    def __init__(self,left_text,right_text,alignments,alignment_indices):
+    def __init__(self,left_text,right_text,alignments,alignment_indices,
+            left_metadata = {},right_metadata={}):
+        
+
         self.left_text = left_text
         self.right_text = right_text
 
         alignments.sort(key = lambda x:x[0],reverse = True)
+        
         self.alignments = alignments
-
         self.alignment_indices = alignment_indices
+        
     
     def __unicode__(self):
         output_string = ""
@@ -123,7 +127,8 @@ class LocalAligner(Aligner):
         alignment_indices = []
         
         a_ints, b_ints, word_map = self._transform_text(left, right)
-        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints,self.match_score,self.mismatch_score, self.gap_score)
+        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints,self.match_score,
+                self.mismatch_score, self.gap_score)
         l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
         reverse_word_map = {v:k for k,v in word_map.items()}
@@ -134,7 +139,7 @@ class LocalAligner(Aligner):
         alignment_indices.append(align_index)
         alignments.append((score, l, r))
         
-        return Alignment(left,right,alignments,alignment_indices)
+        return alignments,alignment_indices
 
     def align_by_section(self,left_sections,right):
         
@@ -172,7 +177,7 @@ class LocalAligner(Aligner):
         
         left = reduce(lambda x,y:x+y,left_sections)
 
-        return Alignment(left,right,alignments,alignment_indices)
+        return alignments,alignment_indices
 
     @jit
     def _compute_matrix(self, left, right, match_score, mismatch_score, gap_score):
@@ -294,7 +299,7 @@ class AffineLocalAligner(LocalAligner):
         alignment_indices.append(align_index)
         alignments.append((score, l, r))
     
-        return Alignment(left,right,alignments,alignment_indices)
+        return (alignments,alignment_indices)
 
 
     @jit
