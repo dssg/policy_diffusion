@@ -159,4 +159,39 @@ if __name__ == "__main__":
         outFile.close()
 
 
+
+##extracts text from model legislation
+def extract_model_legislation(json_file, encoded):
+    '''
+    variables: 
+    json_file: corresponds to json file with model legislation
+    encoded: True/False if json file is b64 encoded
+
+    returns:
+        dictionary with url, date, and text of model legislation 
+    decription:
+        extract text from model legislation  
+    '''
+    data = []
+    with open(json_file) as f:
+        for line in f:
+            data.append(json.loads(line))
+
+    model_legislation = {}
+    for i in range(len(data)):
+        model_legislation[i] = data[i]
+
+    if encoded == True:
+            for i in range(len(model_legislation)):
+                try:
+                    ml = model_legislation[i]['source']
+                    ml = base64.b64decode(ml)
+                    ml = tp.from_buffer(ml)
+                    model_legislation[i]['source'] = ml['content']
+                except AttributeError:
+                    model_legislation[i]['source'] = None
+            return model_legislation
+            
+    else:
+        return model_legislation
  
