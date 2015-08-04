@@ -44,31 +44,16 @@ def get_alignment_highlight(text1,text2):
 
     
 
-def markup_alignment(l,r):
+def markup_alignment_difference(l,r):
     l_styled = []
     r_styled = []
     temp_text = ""
     for i in range(len(l)):
-        if l[i] == r[i] and l[i] != "-":
-            temp_text+=l[i]
-            temp_text+=" "
         if l[i] != r[i]:
-            if len(temp_text)>0:
-                temp_text = u"<mark>{0}</mark>".format(temp_text) 
-                l_styled.append(temp_text)
-                r_styled.append(temp_text)
-                temp_text = ""
-            if l[i] != "-" and r[i] != "-":
-                l_styled.append(u"<b>{0}</b>".format(l[i]))
-                r_styled.append(u"<b>{0}</b>".format(r[i]))
-            else:
-                l_styled.append(l[i])
-                r_styled.append(r[i])
-    
-    temp_text = u"<mark>{0}</mark>".format(temp_text) 
-    l_styled.append(temp_text)
-    r_styled.append(temp_text)
-    return l_styled,r_styled
+            l[i] = u"<mark>{0}</mark>".format(l[i])
+            r[i] = u"<mark>{0}</mark>".format(r[i])
+     
+    return l,r
 
 
 class DemoWebserver(object):
@@ -104,8 +89,8 @@ class DemoWebserver(object):
                     'indices':range(100),
                     'alignment_index':alignment_index,
                     'align_bill':query_bill,
-                    'query_display':query_display,
-                    'align_display':align_display
+                    'query_display':query_bill,
+                    'align_display':alignment_index
             }
             return tmpl.render(**c)
 
@@ -139,7 +124,7 @@ class DemoWebserver(object):
         
         for s,l,r in alignments:
             
-            l,r = markup_alignment(l,r)
+            l,r = markup_alignment_difference(l,r)
             l = " ".join(l)
             r = " ".join(r)
             display_results.append([l,r,s])
