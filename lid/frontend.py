@@ -19,9 +19,9 @@ from lid import LID
 from utils.utils import alignment_tokenizer
 from text_alignment import LocalAligner
 
-env = Environment(loader=FileSystemLoader('/Users/mattburg/Dropbox/dssg/policy_diffusion/html/templates'))
+env = Environment(loader=FileSystemLoader("{0}/html/templates".format(os.environ['POLICY_DIFFUSION'])))
 
-query_samples = [x.strip() for x in open("/Users/mattburg/Dropbox/dssg/policy_diffusion/data/state_bill_samples.txt")]
+query_samples = [x.strip() for x in open("{0}/data/state_bill_samples.txt".format(os.environ['POLICY_DIFFUSION']))]
 
 
 def get_alignment_highlight(text1,text2):
@@ -61,7 +61,7 @@ class DemoWebserver(object):
 
     _cp_config = {
        'tools.staticdir.on' : True,
-       'tools.staticdir.dir' : '/Users/mattburg/Dropbox/dssg/policy_diffusion/html',
+       'tools.staticdir.dir' : "{0}/html".format(os.environ['POLICY_DIFFUSION']),
        'tools.staticdir.index' : 'index.html',
        'tools.sessions.on': True,
     }
