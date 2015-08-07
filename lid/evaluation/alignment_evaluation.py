@@ -15,13 +15,14 @@ from urllib import urlopen
 import re
 import pandas as pd
 from sklearn.decomposition import PCA
-from fast_alignment import *    
-from CleanText import clean_text_for_alignment, clean_text_for_query
+from text_alignment import *    
+from text_cleaning import clean_document
 from compiler.ast import flatten
 from elasticsearch import Elasticsearch
 import re
 import csv
 from sklearn.metrics import roc_curve, auc
+import seaborn as sns
 
 
 #TODO: incorporate plotting into grid code; not sure how to do this in way that works for all algorithms
@@ -29,8 +30,11 @@ from sklearn.metrics import roc_curve, auc
 class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
-                gap_score = -2, gap_start = -5, gap_extend = -0.5):
-    	self.bills = bills
+                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+        '''
+        total_num : total_num of bills to consider
+        '''
+    	self.bills = {key : value for key, value in bills.items() if key <= total_num}
     	self.algorithm = algorithm
         if bills == {}:
             self.scores = None
@@ -42,6 +46,7 @@ class Experiment():
         self.gap_score = gap_score
         self.gap_start = gap_start
         self.gap_extend = gap_extend
+        self.by_section = by_section
 
 
     def evaluate(self):
@@ -73,18 +78,27 @@ class Experiment():
                     text1 = self._prepare_text_left(bills[i]['text'], bills[i]['state'])
                     text2 = self._prepare_text_right(bills[j]['text'], bills[j]['state'])
 
+                    self.results[(i,j)] = {}
+                    self.results[(i,j)]['left_length'] = len(flatten(text1))
+                    self.results[(i,j)]['right_length'] = len(text2)
+                    self.results[(i,j)]['left_state'] = bills[i]['state']
+                    self.results[(i,j)]['right_state'] = bills[j]['state']
+
                     #instantiate aligner with appropriate parameters
                     if self.algorithm == LocalAligner:
                         f = self.algorithm(self.match_score, self.mismatch_score, self.gap_score)
                     elif self.algorithm == AffineLocalAligner:
                         f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
-                    alignment = f.align(text1, text2)
 
-                    self.scores[i,j] = self._get_score(alignment)
+                    if self.by_section:
+                        alignment = f.align_by_section(text1, text2)
+                    else:
+                        alignment = f.align(text1, text2)
 
-                    self.results[(i,j)] ={}
+                    self.scores[i,j] = self._get_score(alignment, i, j)
+
                     self.results[(i,j)]['alignments'] = alignment.alignments
-                    self.results[(i,j)]['score'] = self._get_score(alignment)
+                    self.results[(i,j)]['score'] = self._get_score(alignment, i, j)
                     self.results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
                     self.results[(i,j)]['diff'] = [self._diff(a) for a in alignment.alignments]
                     self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in alignment.alignments]
@@ -93,11 +107,33 @@ class Experiment():
 
         return self.scores, self.results
 
-    def plot_roc():
+    def plot_roc_score(self):
         truth = [value['match'] for key, value in self.results.items()]
         score = [value['score'] for key, value in self.results.items()]
 
-        fpr, tpr = roc_curve(truth, score)
+        roc = roc_curve(truth, score)
+        fpr = roc[0]
+        tpr = roc[1]
+        roc_auc = auc(fpr, tpr)
+
+        plt.figure()
+        plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver operating characteristic example')
+        plt.legend(loc="lower right")
+        plt.show()
+
+    def plot_roc_matches(self):
+        truth = [value['match'] for key, value in self.results.items()]
+        score = [value['features'][0]['num_matches'] for key, value in self.results.items()]
+
+        roc = roc_curve(truth, score)
+        fpr = roc[0]
+        tpr = roc[1]
         roc_auc = auc(fpr, tpr)
 
         plt.figure()
@@ -114,10 +150,9 @@ class Experiment():
 
     def save(self):
         if self.algorithm == LocalAligner:
-            with open('../data/experiment_results/experiment_{0}_m_{1}_mm_{2}_g_{3}.p'.format(self.algorithm._algorithm_name, 
+            with open('../../data/experiment_results/experiment_{0}_m_{1}_mm_{2}_g_{3}.p'.format(self.algorithm._algorithm_name, 
                                 self.match_score, self.mismatch_score, self.gap_score), 'wb') as fp:
-                
-        pickle.dump(self, fp)
+                pickle.dump(self, fp)
 
     @abc.abstractmethod
     def _prepare_text_left(self):
@@ -130,7 +165,7 @@ class Experiment():
 
 
     @abc.abstractmethod
-    def _get_score(self, alignment):
+    def _get_score(self, alignment, i, j):
         pass
 
     #alignment feature methods
@@ -191,13 +226,46 @@ class Experiment():
         for i in self.bills.keys():
             for j in self.bills.keys():
 
+                if self.results[(i,j)]['score'] == 0:
+                    #ignore if score zero because url is broken
+                    pass
+                elif i < j and self.results[(i,j)]['match']:
+                    matchScores.append(min(self.results[(i,j)]['score'],200))
+                else:
+                    nonMatchScores.append(min(self.results[(i,j)]['score'],200))
+
+        bins = np.linspace(min(nonMatchScores + matchScores), max(nonMatchScores + matchScores), 100)
+        plt.hist(nonMatchScores, bins, alpha=0.5, label='Non-Matches')
+        plt.hist(matchScores, bins, alpha=0.5, label='Matches')
+        plt.legend(loc='upper right')
+        plt.xlabel('Alignment Score')
+        plt.ylabel('Number of Bill Pairs')
+        plt.title('Distribution of Alignment Scores')
+        plt.show()
+
+        #make boxplot
+        data_to_plot = [matchScores, nonMatchScores]
+        fig = plt.figure(1, figsize=(9, 6))
+        ax = fig.add_subplot(111)
+        bp = ax.boxplot(data_to_plot)
+        ax.set_xticklabels(['Match Scores', 'Non-Match Scores'])
+        fig.show()
+
+    def plot_num_matches(self):
+
+        matchScores = []
+        nonMatchScores = []
+
+        for i in self.bills.keys():
+            for j in self.bills.keys():
+
                 if self.scores[i,j] == 0:
                     #ignore if score zero because url is broken
                     pass
-                elif i < j and self.bills[i]['match'] == self.bills[j]['match']:
-                    matchScores.append(min(self.scores[i,j],200))
+                elif i < j and self.results[(i,j)]['match']:
+                    matchScores.append(min(self.results[(i,j)]['features'][0]['num_matches'],200))
                 else:
-                    nonMatchScores.append(min(self.scores[i,j],200))
+                    nonMatchScores.append(min(self.results[(i,j)]['features'][0]['num_matches'],200))
 
         bins = np.linspace(min(nonMatchScores + matchScores), max(nonMatchScores + matchScores), 100)
         plt.hist(nonMatchScores, bins, alpha=0.5, label='Non-Matches')
@@ -263,50 +331,68 @@ class Experiment():
 
         return diff
 
-
+########################################################################################################################
 class DocExperiment(Experiment):
 
     def _prepare_text_left(self, text, state):
-
-        text = clean_text_for_query(text, state)
+        if state == 'model_legislation':
+            text = clean_document(text, doc_type = state)
+        else:
+            text = clean_document(text, doc_type = 'state_bill' , state_id = state)
 
         return text.split()
 
 
     def _prepare_text_right(self, text, state):
-
-        text = clean_text_for_query(text, state)
+        if state == 'model_legislation':
+            text = clean_document(text, doc_type = state)
+        else:
+            text = clean_document(text, doc_type = 'state_bill' , state_id = state)
 
         return text.split()
 
 
-    def _get_score(self, alignment):
+    def _get_score(self, alignment, i, j):
         return alignment.alignments[0][0]
 
+########################################################################################################################
+class DocLengthExperiment(DocExperiment):
+    def _get_score(self, alignment, i, j):
+        return alignment.alignments[0][0] * \
+                (len(alignment.alignments[0][1])/float(self.results[(i,j)]['left_length'])) * \
+                (len(alignment.alignments[0][2])/float(self.results[(i,j)]['right_length']))
 
+########################################################################################################################
 class SectionExperiment(Experiment):
+    def __init__(self, bills, algorithm):
+        Experiment.__init__(self, bills, algorithm)
+        self.by_section = True
 
     def _prepare_text_left(self, text, state):
-
-        text = clean_text_for_alignment(text, state)
+        if state == 'model_legislation':
+            text = clean_document(text, doc_type = state, split_to_section = True)
+        else:
+            text = clean_document(text, doc_type = 'state_bill' , state_id = state, split_to_section = True)
 
         return map(lambda x: x.split(), text)
 
 
     def _prepare_text_right(self, text, state):
+        if state == 'model_legislation':
+            text = clean_document(text, doc_type = state)
+        else:
+            text = clean_document(text, doc_type = 'state_bill' , state_id = state)
 
-        text = clean_text_for_alignment(text, state)
-
-        return flatten(map(lambda x: x.split(), text))
+        return text.split()
 
 
-    def _get_score(self, alignment):
+    def _get_score(self, alignment, i, j):
 
         scores = [score for score, left, right in alignment.alignments]
 
-        return sum(scores)
+        return np.mean(scores)
 
-
+########################################################################################################################
 class GridSearch():
 
     def __init__(self, bills, algorithm, match_scores = [2,3,4], mismatch_scores = [-1,-2,-3], 
@@ -319,11 +405,11 @@ class GridSearch():
            self.scores = np.zeros((max(self.bills.keys())+1, max(self.bills.keys())+1))
         self.grid = {}
         self.grid_df = None
-        self.match_score = match_scores
-        self.mismatch_score = mismatch_scores
-        self.gap_score = gap_scores
-        self.gap_start = gap_starts
-        self.gap_extend = gap_extends
+        self.match_scores = match_scores
+        self.mismatch_scores = mismatch_scores
+        self.gap_scores = gap_scores
+        self.gap_starts = gap_starts
+        self.gap_extends = gap_extends
 
 
     def grid_search(self):
@@ -339,11 +425,9 @@ class GridSearch():
                         e = DocExperiment(self.bills, LocalAligner, match_score = match_score, 
                                             mismatch_score = mismatch_score, gap_score = gap_score)
 
-                        self.evaluate_algorithm()
+                        e.evaluate_algorithm()
 
-                        self.grid[(match_score, mismatch_score, gap_score)] = {}
-                        self.grid[(match_score, mismatch_score, gap_score)]['results'] = e.results
-                        self.grid[(match_score, mismatch_score, gap_score)]['scores'] = e.scores
+                        self.grid[(match_score, mismatch_score, gap_score)] = e
 
         elif self.algorithm == AffineLocalAligner:
             for match_score in self.match_scores:
@@ -369,8 +453,8 @@ class GridSearch():
 
     def _create_grid_df(self):
         t = []
-        for key1, value1 in grid.items():
-            for key2, value2 in value1['results'].items():
+        for key1, value1 in self.grid.items():
+            for key2, value2 in value1.results.items():
                 t.append(list(key1) + [key2, value2['score'], value2['match']])
     
         self.grid_df = pd.DataFrame(t)
@@ -379,6 +463,7 @@ class GridSearch():
             self.grid_df.columns = ['match_score', 'mismatch_score', 'gap_score', 'pair', 'score', 'match']
         elif self.algorithm == AffineLocalAligner:
             self.grid_df.columns = ['match_score', 'mismatch_score', 'gap_start', 'gap_extend', 'pair', 'score', 'match']
+
 
     def plot_grid(self):
 
@@ -412,8 +497,14 @@ class GridSearch():
         sns.plt.ylim(0,400)
         sns.plt.show()
 
+
+    def plot_roc(self):
+        experiments = [(str(key), value) for key,value in self.grid.items()]
+        roc_experiments(experiments)
+
+
     def save(self, name):
-        with open('../data/grid_results/{0}.p'.format(name), 'wb') as fp:
+        with open('../../data/grid_results/{0}.p'.format(name), 'wb') as fp:
             pickle.dump(self, fp)
 
 
@@ -529,57 +620,139 @@ def test_alignment_features():
     check_features_truth(truth, features)
 
 
+############################################################
+##analysis functions
+def roc_experiments(experiments):
+    '''
+    args:
+        experiments : list of tuples where first entry is name of experiment and second entry is experiment object
+    returns:
+        roc plot of all the experiments
+    '''
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(len(experiments)):
+        truth = [value['match'] for key, value in experiments[i][1].results.items()]   
+        score = [value['score'] for key, value in experiments[i][1].results.items()]
+
+        roc = roc_curve(truth, score)
+        fpr[i] = roc[0]
+        tpr[i] = roc[1]
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Plot ROC curve
+    plt.figure()
+    for i in range(len(experiments)):
+        plt.plot(fpr[i], tpr[i], label='ROC curve of algorithm {0} (area = {1:0.2f})'
+                                       ''.format(experiments[i][0], roc_auc[i]))
+
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Comparison of ROC curves of multiple experiments')
+    plt.legend(loc="lower right")
+    plt.show()
+
+
 
 ############################################################
 ##data creating, saving, and loading
 
 def load_bills():
-    with open('../data/bills.p','rb') as fp:
+    with open('../../data/bills.p','rb') as fp:
         bills =pickle.load(fp)
 
     return bills
 
 def load_pickle(name):
-    with open('../data/{0}.p'.format(name),'rb') as fp:
+    with open('{0}.p'.format(name),'rb') as fp:
         f =pickle.load(fp)
 
     return f
 
 def load_scores():
-    scores = np.load('../data/scores.npy')
+    scores = np.load('../../data/scores.npy')
 
     return scores
 
 
 def save_results(results):
-    with open('../data/results.json','wb') as fp:
+    with open('../../data/results.json','wb') as fp:
         pickle.dump(results, fp)
 
 
 def load_results():
-    with open('../data/results.json','rb') as fp:
+    with open('../../data/results.json','rb') as fp:
         data =pickle.load(fp)
     return data
-
 
 
 if __name__ == '__main__':
 
     bills = load_bills()
 
-    print 'testing local alignment'
-    e = DocExperiment(bills, LocalAligner)
+    # print 'testing local alignment'
+    # e = DocExperiment(bills, LocalAligner)
 
-    e.evaluate_algorithm()
+    # e.evaluate_algorithm()
 
-    e.save('local_experiment')
+    # with open('experiment.p', 'wb') as fp:
+    #     pickle.dump(e, fp)
+
+    # e.save('local_experiment')
 
     # print 'testing section local alignment'
-    # e = SectionExperiment(bills, SectionLocalAlignment)
+    # e = SectionExperiment(bills, LocalAligner)
     # e.evaluate_algorithm()
+
+    # with open('section_experiment.p', 'wb') as fp:
+    #     pickle.dump(e, fp)
 
     # e.save('section_experiment')
 
     # print 'testing grid alignment'
+    # g = GridSearch(bills, LocalAligner)
+    # g.grid_search()
+
+    # with open('grid_experiment.p', 'wb') as fp:
+    #     pickle.dump(g, fp)
+
+    # g.save('grid')
+
+    # with open('section_experiment.p', 'rb') as fp:
+    #     section = pickle.load(fp)
 
 
+    # print 'testing AffineLocalAligner local alignment...'
+    # e = DocExperiment(bills, AffineLocalAligner)
+    # e.evaluate_algorithm()
+
+    # with open('affine_experiment.p', 'wb') as fp:
+    #     pickle.dump(e, fp)
+
+    # e.save('affine_experiment')
+
+    # print 'testing AffineLocalAligner with sections'
+    # e = SectionExperiment(bills, AffineLocalAligner)
+    # e.evaluate_algorithm()
+
+    # with open('affine_section_experiment.p', 'wb') as fp:
+    #     pickle.dump(e, fp)
+
+    # e.save('affine_section_experiment')
+
+   # with open('grid_experiment.p', 'rb') as fp:
+   #      grid = pickle.load(fp)
+
+
+    print 'testing DocLengthExperiment local alignment...'
+    e = DocLengthExperiment(bills, LocalAligner)
+    e.evaluate_algorithm()
+
+    with open('doc_length_experiment.p', 'wb') as fp:
+        pickle.dump(e, fp)
+
+    # e.save('doc_length_experiment')
