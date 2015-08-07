@@ -190,41 +190,42 @@ def scrape_alec_exposed_bills ():
         date = '2010-2013'
         print name
         print source
-        Jsonbill = bill_source_to_json(url, source, source)
+        Jsonbill = bill_source_to_json_not_encoded(url, source, date)
         f2.write("{0}\n".format(Jsonbill))
 
 
 def scrape_CSG_model_legislation():
-    url = 'http://www.csg.org/programs/policyprograms/SSL.aspx'
-    doc = urllib2.urlopen(url).read()
-    bs = BeautifulSoup(doc)
+url = 'http://www.csg.org/programs/policyprograms/SSL.aspx'
+doc = urllib2.urlopen(url).read()
+bs = BeautifulSoup(doc)
 
-    links = []
-    for link in bs.find_all('a'):
-        if link.has_attr('href'):
-            candidate = link.attrs['href']
-            # links with pdf extension tend to be model bills
-            if candidate[-4:] == ".pdf":  
-                links.append(candidate)
+links = []
+for link in bs.find_all('a'):
+    if link.has_attr('href'):
+        candidate = link.attrs['href']
+        # links with pdf extension tend to be model bills
+        if candidate[-4:] == ".pdf":
+            links.append(candidate)
 
-    # only keeps distinct links
-    inks = list(set(links))
+# only keeps distinct links
+links2 = list(set(links))
 
-    badCount = 0
-    goodCount = 0
-    with open('alice_bills.json', 'w') as f:
-        for link in links:
-            try:
-                url_key = {}
-                source = urllib2.urlopen(link).read()
-                Jsonbill = bill_source_to_json(link, source, None)
-                f.write("{0}\n".format(Jsonbill))
-                goodCount += 1
-                print goodCount
-            except:
-                badCount += 1
+badCount = 0
+goodCount = 0
 
-    print str(badCount) + " did not work"
+with open('csg_bills.json', 'w') as f:
+    for line in links2:
+        try:
+            url_key = {}
+            source = urllib2.urlopen(line).read()
+            Jsonbill = bill_source_to_json(link, source, None)
+            f.write("{0}\n".format(Jsonbill))
+            goodCount += 1
+        except:
+            badCount += 1
+    print line
+
+print str(badCount) + " did not work"
 
 
 def scrape_ALICE_legislation():
@@ -258,7 +259,7 @@ def scrape_ALICE_legislation():
 
     badCount = 0
     goodCount = 0
-    with open('csg_bills.json', 'w') as f:
+    with open('alice_bills.json', 'w') as f:
         for link in billList:
             # url_key = {}
             # source = urllib2.urlopen(link).read()
@@ -269,7 +270,6 @@ def scrape_ALICE_legislation():
                 Jsonbill = bill_source_to_json(link, source, None)
                 f.write("{0}\n".format(Jsonbill))
                 goodCount += 1
-                print goodCount
             except:
                 badCount += 1
 
@@ -277,22 +277,22 @@ def scrape_ALICE_legislation():
 
 def scrape_misc_legislation():
         # Access list of clean urls
-    with open('/mnt/data/sunlight/dssg/model_legislation/clean_urls.txt',
-            'r') as f:
-        links = f.read().splitlines()
+with open('/mnt/data/sunlight/dssg/model_legislation/clean_urls.txt',
+    'r') as f:
+links = f.read().splitlines()
 
-    badCount = 0
-    goodCount = 0
-    with open('misc_bills.json', 'w') as jsonfile:
-        for link in links:
-            try:
-                source = urllib2.urlopen(link).read()
-                Jsonbill = bill_source_to_json(link, source, None)
-                jsonfile.write("{0}\n".format(Jsonbill))
-                goodCount += 1
-                print goodCount
-            except:
-                badCount += 1
+badCount = 0
+goodCount = 0
+with open('misc_bills.json', 'w') as jsonfile:
+    for link in links:
+        try:
+            source = urllib2.urlopen(link).read()
+            Jsonbill = bill_source_to_json(link, source, None)
+            jsonfile.write("{0}\n".format(Jsonbill))
+            goodCount += 1
+            print goodCount
+        except:
+            badCount += 1
 
     print str(badCount) + " did not work"
     print str(goodCount) + " worked"

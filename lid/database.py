@@ -118,7 +118,7 @@ class ElasticConnection():
 
     
 
-    def similar_doc_query(self,query,state_id = None,num_results = 1000,return_fields = ["state"]):
+    def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"]):
         json_query = """ 
             {
                 "query": {
@@ -190,7 +190,6 @@ class ElasticConnection():
 
 
 
-
     def get_bills_by_state(self, state, num_bills = 'all', step = 3000):
         es = self.es_connection
 
@@ -222,7 +221,6 @@ class ElasticConnection():
                 start +=  step
 
         return all_bills
-
 
 
 def parallel_query(query):

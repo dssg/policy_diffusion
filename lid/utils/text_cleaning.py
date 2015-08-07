@@ -11,7 +11,7 @@ from pprint import pprint
 import nltk
 
 #custom modules
-from database import ElasticConnection
+#from database import ElasticConnection
 
 def clean_text(text, lower = True):
     '''

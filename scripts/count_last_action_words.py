@@ -82,6 +82,7 @@ def isPassed(last_action):
 	return False
 
 status = defaultdict(list)
+#Code error here: "list indeces must be integers, not str"
 num_passed = Counter()
 for key, value in last_actions.iteritems():
 	if isPassed(key):
@@ -121,4 +122,8 @@ geom_line(color = 'blue') + facet_wrap('state') +\
 ylab('') + \
 ggtitle('Average bill length by state') +\
 theme(axis_text_x  = element_text(angle = 90, hjust = 1))
+
+#plot number of bills introduced by state and by month
+
+#plot total number of bills introduced by all states vs federal government by month
 
