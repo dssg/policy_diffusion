@@ -128,21 +128,10 @@ class LocalAligner(Aligner):
         alignment_indices = []
         
         a_ints, b_ints, word_map = self._transform_text(left, right)
-<<<<<<< HEAD
 
-        # t1 = time.time()
-
-        score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints,self.match_score,self.mismatch_score, self.gap_score)
-        
-        # delta = time.time() - t1
-        # print 'local compute_matrix time: ', delta
-
-        # t1 = time.time()
-
-=======
         score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints,self.match_score,
                 self.mismatch_score, self.gap_score)
->>>>>>> 1381e37799846fbd2585d9cdf0d40b941e32fcf7
+
         l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
         # delta = time.time() - t1
