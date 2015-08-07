@@ -194,7 +194,7 @@ class ElasticConnection():
     def get_bills_by_state(self, state, num_bills = 'all', step = 3000):
         es = self.es_connection
 
-        if num_bills != 'all':
+        if num_bills == 'all':
             bills = es.search(index='state_bills', doc_type='bill_document', q= 'state:' + state)
             total = bills['hits']['total']
         else:
@@ -207,13 +207,19 @@ class ElasticConnection():
         all_bills = []
         start = 0
         bad_count = 0
-        while start <= total:
-            body = body_gen(start,step)                   
+        if step >= total:
+            body = body_gen(start,total)                   
             bills = es.search(index="state_bills", body=body)
             bill_list = bills['hits']['hits']
-            all_bills.append(bill_list)
+            all_bills.extend(bill_list)
+        else:
+            while start <= total:
+                body = body_gen(start,step)                   
+                bills = es.search(index="state_bills", body=body)
+                bill_list = bills['hits']['hits']
+                all_bills.extend(bill_list)
 
-            start +=  step
+                start +=  step
 
         return all_bills
 
