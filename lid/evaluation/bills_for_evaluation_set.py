@@ -68,7 +68,7 @@ def get_bill_by_id(unique_id):
     return bill_text
 
 def grab_more_eval_bills():
-    with open('../data/evaluation_set/bills_for_evaluation_set.csv') as f:
+    with open('../../data/evaluation_set/bills_for_evaluation_set.csv') as f:
         bills_list = [row for row in csv.reader(f.read().splitlines())]
         
     bill_ids_list = []
@@ -126,7 +126,7 @@ def grab_more_eval_bills():
 
 def create_save_bills(bill_list):
     bills = create_bills(bill_list)
-    with open('../data/bills.p', 'wb') as fp:
+    with open('../../data/bills.p', 'wb') as fp:
         pickle.dump(bills, fp)
 
     return bills
@@ -158,13 +158,13 @@ if __name__ == '__main__':
     ('http://www.capitol.hawaii.gov/session2015/bills/SB129_.PDF','hi'),
     ('http://nebraskalegislature.gov/FloorDocs/104/PDF/Intro/LB493.pdf', 'ne'),
     ('http://www.gencourt.state.nh.us/legislation/2015/HB0600.html', 'nh')],
-    [('http://alecexposed.org/w/images/2/2d/7K5-No_Sanctuary_Cities_for_Illegal_Immigrants_Act_Exposed.pdf', None),
+    [('http://alecexposed.org/w/images/2/2d/7K5-No_Sanctuary_Cities_for_Illegal_Immigrants_Act_Exposed.pdf', 'model_legislation'),
     ('http://www.kslegislature.org/li_2012/b2011_12/measures/documents/hb2578_00_0000.pdf', 'ks'),
     ('http://flsenate.gov/Session/Bill/2011/0237/BillText/Filed/HTML','fl'),
     ('http://openstates.org/al/bills/2012rs/SB211/','al'),
     ('http://le.utah.gov/~2011/bills/static/HB0497.html','ut'),
     ('http://webserver1.lsb.state.ok.us/cf_pdf/2013-14%20FLR/HFLR/HB1436%20HFLR.PDF','ok')],
-    [('http://www.alec.org/model-legislation/the-disclosure-of-hydraulic-fracturing-fluid-composition-act/', None),
+    [('http://www.alec.org/model-legislation/the-disclosure-of-hydraulic-fracturing-fluid-composition-act/', 'model_legislation'),
     ('ftp://ftp.legis.state.tx.us/bills/82R/billtext/html/house_bills/HB03300_HB03399/HB03328S.htm', 'tx')],
     [('http://www.legislature.mi.gov/(S(ntrjry55mpj5pv55bv1wd155))/documents/2005-2006/billintroduced/House/htm/2005-HIB-5153.htm', 'mi'),
     ('http://www.schouse.gov/sess116_2005-2006/bills/4301.htm','sc'),
@@ -175,10 +175,10 @@ if __name__ == '__main__':
     ('http://legisweb.state.wy.us/2008/Enroll/HB0137.pdf', 'wy'),
     ('http://www.kansas.gov/government/legislative/bills/2006/366.pdf', 'ks'),
     ('http://billstatus.ls.state.ms.us/documents/2006/pdf/SB/2400-2499/SB2426SG.pdf', 'mi')],
-    [('http://www.alec.org/model-legislation/state-withdrawal-from-regional-climate-initiatives/', None),
+    [('http://www.alec.org/model-legislation/state-withdrawal-from-regional-climate-initiatives/', 'model_legislation'),
     ('http://www.legislature.mi.gov/documents/2011-2012/resolutionintroduced/House/htm/2011-HIR-0134.htm', 'mi'),
     ('http://www.nmlegis.gov/Sessions/11%20Regular/memorials/house/HJM024.html', 'nm')],
-    [('http://alecexposed.org/w/images/9/90/7J1-Campus_Personal_Protection_Act_Exposed.pdf', None),
+    [('http://alecexposed.org/w/images/9/90/7J1-Campus_Personal_Protection_Act_Exposed.pdf', 'model_legislation'),
     ('ftp://ftp.legis.state.tx.us/bills/831/billtext/html/house_bills/HB00001_HB00099/HB00056I.htm', 'tx')],
     # [
     # ('http://essexuu.org/ctstat.html', 'ct'), we don't have connecituc

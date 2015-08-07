@@ -168,8 +168,6 @@ class LocalAligner(Aligner):
 
             l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
 
-            score = score_matrix.max()
-
             reverse_word_map = {v:k for k,v in word_map.items()}
             reverse_word_map["-"] = "-" 
             l = [reverse_word_map[w] for w in l]
@@ -325,6 +323,48 @@ class AffineLocalAligner(LocalAligner):
         return Alignment(left,right,alignments,alignment_indices)
 
 
+    def align_by_section(self, left_sections, right):
+        
+        alignments = []
+        alignment_indices = []
+
+        #keeps track of beginning index of section
+        #to recover correct indices of sections
+        section_start_index = 0
+
+        for left in left_sections:
+
+            a_ints, b_ints, word_map = self._transform_text(left, right)
+
+            H, F, E = self._compute_matrix(a_ints, b_ints, 
+                                        self.match_score, self.mismatch_score, 
+                                        self.gap_start, self.gap_extend)
+
+            l, r, score, align_index = self._backtrace(a_ints, b_ints, H , F, E, 
+                                                    self.match_score, self.mismatch_score, 
+                                                    self.gap_start, self.gap_extend)
+
+            reverse_word_map = {v:k for k,v in word_map.items()}
+            reverse_word_map["-"] = "-" 
+            l = [reverse_word_map[w] for w in l]
+            r = [reverse_word_map[w] for w in r]
+
+            alignments.append((score, l, r))
+            
+            #adjust for section
+            align_index['left_start'] += section_start_index
+            align_index['left_end'] += section_start_index
+            
+            alignment_indices.append(align_index)
+
+            #update section_start_index
+            section_start_index += len(left)
+        
+        left = reduce(lambda x,y:x+y,left_sections)
+
+        return Alignment(left,right,alignments,alignment_indices)
+
+
     @jit
     def _compute_matrix(self, left, right, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
         
@@ -414,12 +454,12 @@ class AffineLocalAligner(LocalAligner):
 
             #determine whether it is a match or mismatch
             if left[i-1] == right[j-1]:
-                score = match_score
+                insert_score = match_score
             else:
-                score = mismatch_score
+                insert_score = mismatch_score
 
             #do not insert gap
-            if H[i,j] == H[i-1,j-1] + score: 
+            if H[i,j] == H[i-1,j-1] + insert_score: 
                 i -= 1
                 j -= 1
                 left_alignment = [left[i]] + left_alignment
@@ -725,10 +765,11 @@ def section_unit_tests(Algorithm):
     for score, left, right in Alignment.alignments:
         true_score = f.alignment_score(left, right)
         if true_score != score:
+            print 'left: ', left
+            print 'right: ', right
             print 'true alignment score: ', true_score
             print 'calculated score: ', score
             good_job = False
-            break
 
     if good_job:
         print "calculated alignment scores correctly"
@@ -855,23 +896,26 @@ if __name__ == '__main__':
     # print "running LocalAligner speed tests.... \n"
     # LocalAligner_speed_test()
 
-    print "running LocalAligner index tests.... \n"
-    doc_test_alignment_indices(LocalAligner)
+    # print "running LocalAligner index tests.... \n"
+    # doc_test_alignment_indices(LocalAligner)
 
-    # print "running AffineLocalAligner unit tests.... \n"
-    # generic_doc_unit_test(AffineLocalAligner)
+    print "running AffineLocalAligner unit tests.... \n"
+    generic_doc_unit_test(AffineLocalAligner)
 
     # print "running AffineLocalAligner speed tests.... \n"
     # generic_doc_speed_test(AffineLocalAligner)
 
-    # print "running section unit tests.... \n"
+    # print "running section unit tests for localaligner.... \n"
     # section_unit_tests(LocalAligner)
+
+    print "running section unit tests for affinealigner.... \n"
+    section_unit_tests(AffineLocalAligner)
 
     # print "running section speed tests.... \n"
     # section_speed_test()
 
-    print 'running test on keeping track of indices for section algorithm..... \n'
-    section_test_alignment_indices()
+    # print 'running test on keeping track of indices for section algorithm..... \n'
+    # section_test_alignment_indices()
 
 
 
