@@ -146,7 +146,7 @@ class LocalAligner(Aligner):
         alignment_indices.append(align_index)
         alignments.append((score, l, r))
         
-        return alignments,alignment_indices
+        return Alignment(left,right,alignments,alignment_indices)
 
     def align_by_section(self, left_sections, right):
         
@@ -184,7 +184,7 @@ class LocalAligner(Aligner):
         
         left = reduce(lambda x,y:x+y,left_sections)
 
-        return alignments,alignment_indices
+        return Alignment(left,right,alignments,alignment_indices)
 
     @jit
     def _compute_matrix(self, left, right, match_score, mismatch_score, gap_score):
@@ -318,7 +318,7 @@ class AffineLocalAligner(LocalAligner):
         alignment_indices.append(align_index)
         alignments.append((score, l, r))
     
-        return (alignments,alignment_indices)
+        return Alignment(left,right,alignments,alignment_indices)
 
 
     def align_by_section(self, left_sections, right):
