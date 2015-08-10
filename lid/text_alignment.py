@@ -24,6 +24,7 @@ from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
 from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
 
+
 #TODO: use alignment algorithm
 #repsrents two aligned pieces of text
 class Alignment(object):
