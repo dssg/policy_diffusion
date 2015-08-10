@@ -528,7 +528,7 @@ class GridSearch():
     def _create_grid_df(self):
         t = []
         for key1, value1 in self.grid.items():
-            for key2, value2 in value1.results.items():
+            for key2, value2 in value1['results'].items():
                 t.append(list(key1) + [key2, value2['score'], value2['match']])
     
         self.grid_df = pd.DataFrame(t)
@@ -785,6 +785,8 @@ if __name__ == '__main__':
     # test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
 
     # test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
+
+    # test_experiment(GridSearch, bills, AffineLocalAligner, 'grid_affine_experiment')
 
     # test_experiment(DocExperiment, bills, AffineLocalAligner, 'affine_local_experiment')
 
