@@ -32,7 +32,7 @@ import random
 class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
-                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 15, by_section = False):
         '''
         total_num : total_num of bills to consider
         '''
@@ -50,6 +50,14 @@ class Experiment():
                 bills_to_keep.append(match_group.pop(choice))
 
                 take -= 1
+
+        #get rest of bills to get total_num of bills
+        left = set([key for key, value in bills.items()]) - set(bills_to_keep)
+        left = list(left)
+
+        for i in range(total_num - len(left)):
+            choice = random.choice(range(len(match_group)))
+            bills_to_keep.append(match_group.pop(choice))
 
     	self.bills = {key : bills[key] for key in bills_to_keep}
     	self.algorithm = algorithm
@@ -486,7 +494,7 @@ class GridSearch():
         self.gap_starts = gap_starts
         self.gap_extends = gap_extends
 
-    def grid_search(self):
+    def evaluate_algorithm(self):
         #only works for doc experiemnt currently
         #determine parameters to do grid search on for given algorithm
         if self.algorithm == LocalAligner:    
@@ -780,13 +788,13 @@ if __name__ == '__main__':
 
     bills = load_bills()
 
-    e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
+    # e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
 
     # test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
 
-    # test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
+    test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
 
-    # test_experiment(GridSearch, bills, AffineLocalAligner, 'grid_affine_experiment')
+    test_experiment(GridSearch, bills, AffineLocalAligner, 'grid_affine_experiment')
 
     # test_experiment(DocExperiment, bills, AffineLocalAligner, 'affine_local_experiment')
 
