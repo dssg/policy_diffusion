@@ -90,45 +90,44 @@ class Experiment():
         returns:
             matrix with scores between all pairs and a dictionary with information
         '''
-        for i in self.bills.keys():
-            for j in self.bills.keys():  
-                if i != j:              
+        param_combs = self._gen_param_combs()
+        for i,j in param_combs:
 
-                    if self.bills[i] == {} or self.bills[j] == {}:
-                        continue
+            if self.bills[i] == {} or self.bills[j] == {}:
+                continue
 
-                    if bills[i]['text'] == '' or bills[j]['text'] == '':
-                        continue
+            if bills[i]['text'] == '' or bills[j]['text'] == '':
+                continue
 
-                    text1 = self._prepare_text_left(bills[i]['text'], bills[i]['state'])
-                    text2 = self._prepare_text_right(bills[j]['text'], bills[j]['state'])
+            text1 = self._prepare_text_left(bills[i]['text'], bills[i]['state'])
+            text2 = self._prepare_text_right(bills[j]['text'], bills[j]['state'])
 
-                    self.results[(i,j)] = {}
-                    self.results[(i,j)]['left_length'] = len(flatten(text1))
-                    self.results[(i,j)]['right_length'] = len(text2)
-                    self.results[(i,j)]['left_state'] = bills[i]['state']
-                    self.results[(i,j)]['right_state'] = bills[j]['state']
+            self.results[(i,j)] = {}
+            self.results[(i,j)]['left_length'] = len(flatten(text1))
+            self.results[(i,j)]['right_length'] = len(text2)
+            self.results[(i,j)]['left_state'] = bills[i]['state']
+            self.results[(i,j)]['right_state'] = bills[j]['state']
 
-                    #instantiate aligner with appropriate parameters
-                    if self.algorithm == LocalAligner:
-                        f = self.algorithm(self.match_score, self.mismatch_score, self.gap_score)
-                    elif self.algorithm == AffineLocalAligner:
-                        f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
+            #instantiate aligner with appropriate parameters
+            if self.algorithm == LocalAligner:
+                f = self.algorithm(self.match_score, self.mismatch_score, self.gap_score)
+            elif self.algorithm == AffineLocalAligner:
+                f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
 
-                    if self.by_section:
-                        alignment = f.align_by_section(text1, text2)
-                    else:
-                        alignment = f.align(text1, text2)
+            if self.by_section:
+                alignment = f.align_by_section(text1, text2)
+            else:
+                alignment = f.align(text1, text2)
 
-                    self.scores[i,j] = self._get_score(alignment, i, j)
+            self.scores[i,j] = self._get_score(alignment, i, j)
 
-                    self.results[(i,j)]['alignments'] = alignment.alignments
-                    self.results[(i,j)]['score'] = self._get_score(alignment, i, j)
-                    self.results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
-                    self.results[(i,j)]['diff'] = [self._diff(a) for a in alignment.alignments]
-                    self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in alignment.alignments]
+            self.results[(i,j)]['alignments'] = alignment.alignments
+            self.results[(i,j)]['score'] = self._get_score(alignment, i, j)
+            self.results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
+            self.results[(i,j)]['diff'] = [self._diff(a) for a in alignment.alignments]
+            self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in alignment.alignments]
 
-                    print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignment.alignments[0][0])
+            print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignment.alignments[0][0])
 
         return self.scores, self.results
 
@@ -178,6 +177,12 @@ class Experiment():
             with open('../../data/experiment_results/experiment_{0}_m_{1}_mm_{2}_g_{3}.p'.format(self.algorithm._algorithm_name, 
                                 self.match_score, self.mismatch_score, self.gap_score), 'wb') as fp:
                 pickle.dump(self, fp)
+
+
+    @abc.abstractmethod
+    def _gen_param_combs(self):
+        pass
+
 
     @abc.abstractmethod
     def _prepare_text_left(self):
@@ -359,6 +364,17 @@ class Experiment():
 ########################################################################################################################
 class DocExperiment(Experiment):
 
+    def _gen_param_combs(self):
+        keys = self.bills.keys()
+
+        param_combs = []
+        for i in keys:
+            for j in keys:
+                if i < j:
+                    param_combs.append((i,j))
+
+        return param_combs
+
     def _prepare_text_left(self, text, state):
         if state == 'model_legislation':
             text = clean_document(text, doc_type = state)
@@ -418,6 +434,17 @@ class SectionExperiment(Experiment):
     def __init__(self, bills, algorithm):
         Experiment.__init__(self, bills, algorithm)
         self.by_section = True
+
+    def _gen_param_combs(self):
+        keys = self.bills.keys()
+
+        param_combs = []
+        for i in keys:
+            for j in keys:
+                if i != j:
+                    param_combs.append((i,j))
+
+        return param_combs
 
     def _prepare_text_left(self, text, state):
         if state == 'model_legislation':
@@ -536,7 +563,7 @@ class GridSearch():
     def _create_grid_df(self):
         t = []
         for key1, value1 in self.grid.items():
-            for key2, value2 in value1['results'].items():
+            for key2, value2 in value1.results.items():
                 t.append(list(key1) + [key2, value2['score'], value2['match']])
     
         self.grid_df = pd.DataFrame(t)
@@ -829,4 +856,6 @@ if __name__ == '__main__':
 
     # with open('section_tfidf_experiment.p', 'wb') as fp:
     #     pickle.dump(e, fp)
+
+
 
