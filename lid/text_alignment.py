@@ -20,7 +20,6 @@ import pandas as pd
 import random
 from compiler.ast import flatten
 from utils.utils import find_subsequence
-from utils import find_subsequence
 from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
 from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
