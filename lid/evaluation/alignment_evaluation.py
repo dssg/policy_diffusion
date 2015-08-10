@@ -32,7 +32,7 @@ import random
 class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
-                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 15, by_section = False):
+                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 100, by_section = False):
         '''
         total_num : total_num of bills to consider
         '''
@@ -792,9 +792,9 @@ if __name__ == '__main__':
 
     # test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
 
-    test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
+    #test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
 
-    test_experiment(GridSearch, bills, AffineLocalAligner, 'grid_affine_experiment')
+    #test_experiment(GridSearch, bills, AffineLocalAligner, 'grid_affine_experiment')
 
     # test_experiment(DocExperiment, bills, AffineLocalAligner, 'affine_local_experiment')
 
