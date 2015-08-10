@@ -23,6 +23,8 @@ import re
 import csv
 from sklearn.metrics import roc_curve, auc
 import seaborn as sns
+from score_alignments import *
+import random
 
 
 #TODO: incorporate plotting into grid code; not sure how to do this in way that works for all algorithms
@@ -34,7 +36,22 @@ class Experiment():
         '''
         total_num : total_num of bills to consider
         '''
-    	self.bills = {key : value for key, value in bills.items() if key <= total_num}
+        groups = set([value['match'] for key, value in bills.items()])
+        num_groups = len(groups)
+
+        bills_to_keep = []
+        for i in range(num_groups):
+            match_group = [key for key, value in bills.items() if value['match'] == i]
+
+            take = total_num / num_groups
+            
+            while match_group != [] and take > 0:
+                choice = random.choice(range(len(match_group)))
+                bills_to_keep.append(match_group.pop(choice))
+
+                take -= 1
+
+    	self.bills = {key : bills[key] for key in bills_to_keep}
     	self.algorithm = algorithm
         if bills == {}:
             self.scores = None
@@ -358,9 +375,35 @@ class DocExperiment(Experiment):
 ########################################################################################################################
 class DocLengthExperiment(DocExperiment):
     def _get_score(self, alignment, i, j):
-        return alignment.alignments[0][0] * \
-                (len(alignment.alignments[0][1])/float(self.results[(i,j)]['left_length'])) * \
-                (len(alignment.alignments[0][2])/float(self.results[(i,j)]['right_length']))
+
+        return weight_length(alignment, self.results[(i,j)]['left_length'], 
+            self.results[(i,j)]['right_length'])
+
+class DocTfidfExperiment(DocExperiment):
+    def __init__(self, bills, algorithm, state_tfidf, match_score = 3, mismatch_score = -1, 
+            gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+        '''
+        total_num : total_num of bills to consider
+        '''
+        self.bills = {key : value for key, value in bills.items() if key <= total_num}
+        self.algorithm = algorithm
+        if bills == {}:
+            self.scores = None
+        else:
+           self.scores = np.zeros((max(self.bills.keys())+1, max(self.bills.keys())+1))
+        self.results = {}
+        self.match_score = match_score
+        self.mismatch_score = mismatch_score
+        self.gap_score = gap_score
+        self.gap_start = gap_start
+        self.gap_extend = gap_extend
+        self.by_section = by_section
+        self.state_tfidf = state_tfidf
+
+    def _get_score(self, alignment, i, j):
+        return weight_tfidf(alignment, self.state_tfidf, self.results[(i,j)]['left_state'], 
+            self.results[(i,j)]['right_state'])
+
 
 ########################################################################################################################
 class SectionExperiment(Experiment):
@@ -376,7 +419,6 @@ class SectionExperiment(Experiment):
 
         return map(lambda x: x.split(), text)
 
-
     def _prepare_text_right(self, text, state):
         if state == 'model_legislation':
             text = clean_document(text, doc_type = state)
@@ -385,12 +427,45 @@ class SectionExperiment(Experiment):
 
         return text.split()
 
-
     def _get_score(self, alignment, i, j):
 
         scores = [score for score, left, right in alignment.alignments]
 
         return np.mean(scores)
+
+########################################################################################################################
+
+class SectionLengthExperiment(SectionExperiment):
+    def _get_score(self, alignment, i, j):
+
+        return weight_length(alignment, self.results[(i,j)]['left_length'], 
+            self.results[(i,j)]['right_length'])
+
+
+class SectionTfidfExperiment(SectionExperiment):
+    def __init__(self, bills, algorithm, state_tfidf, match_score = 3, mismatch_score = -1, 
+            gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+        '''
+        total_num : total_num of bills to consider
+        '''
+        self.bills = {key : value for key, value in bills.items() if key <= total_num}
+        self.algorithm = algorithm
+        if bills == {}:
+            self.scores = None
+        else:
+           self.scores = np.zeros((max(self.bills.keys())+1, max(self.bills.keys())+1))
+        self.results = {}
+        self.match_score = match_score
+        self.mismatch_score = mismatch_score
+        self.gap_score = gap_score
+        self.gap_start = gap_start
+        self.gap_extend = gap_extend
+        self.by_section = by_section
+        self.state_tfidf = state_tfidf
+
+    def _get_score(self, alignment, i, j):
+        return weight_tfidf(alignment, self.state_tfidf, self.results[(i,j)]['left_state'], 
+            self.results[(i,j)]['right_state'])
 
 ########################################################################################################################
 class GridSearch():
@@ -410,7 +485,6 @@ class GridSearch():
         self.gap_scores = gap_scores
         self.gap_starts = gap_starts
         self.gap_extends = gap_extends
-
 
     def grid_search(self):
         #only works for doc experiemnt currently
@@ -690,69 +764,59 @@ def load_results():
     return data
 
 
+def test_experiment(experiment, bills, algorithm, file_name):
+    print 'testing {0}...'.format(file_name)
+
+    e = experiment(bills, algorithm)
+    e.evaluate_algorithm()
+
+    with open('{0}.p'.format(file_name), 'wb') as fp:
+        pickle.dump(e, fp)
+
+    return e
+
+
 if __name__ == '__main__':
 
     bills = load_bills()
 
-    # print 'testing local alignment'
-    # e = DocExperiment(bills, LocalAligner)
+    e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
 
+    # test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
+
+    # test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
+
+    # test_experiment(DocExperiment, bills, AffineLocalAligner, 'affine_local_experiment')
+
+    # test_experiment(SectionExperiment, bills, AffineLocalAligner, 'affine_section_experiment')
+
+    # test_experiment(DocLengthExperiment, bills, LocalAligner, 'length_doc_local_experiment')
+
+    # test_experiment(SectionLengthExperiment, bills, LocalAligner, 'section_doc_local_experiment')
+
+
+    # print 'testing DocTfidfExperiment local alignment...'
+    # print 'loading state tfidfs....'
+    # with open('state_tfidfs.p', 'rb') as fp:
+    #     tfidf = pickle.load(fp)
+
+    # print 'evaluating algorithm....'
+    # e = DocTfidfExperiment(bills, LocalAligner, tfidf)
     # e.evaluate_algorithm()
 
-    # with open('experiment.p', 'wb') as fp:
+    # with open('doc_tfidf_experiment.p', 'wb') as fp:
     #     pickle.dump(e, fp)
 
-    # e.save('local_experiment')
 
-    # print 'testing section local alignment'
-    # e = SectionExperiment(bills, LocalAligner)
+    # print 'testing sectionTfidfExperiment local alignment...'
+    # print 'loading state tfidfs....'
+    # with open('state_tfidfs.p', 'rb') as fp:
+    #     tfidf = pickle.load(fp)
+
+    # print 'evaluating algorithm....'
+    # e = SectionTfidfExperiment(bills, LocalAligner, tfidf)
     # e.evaluate_algorithm()
 
-    # with open('section_experiment.p', 'wb') as fp:
+    # with open('section_tfidf_experiment.p', 'wb') as fp:
     #     pickle.dump(e, fp)
 
-    # e.save('section_experiment')
-
-    # print 'testing grid alignment'
-    # g = GridSearch(bills, LocalAligner)
-    # g.grid_search()
-
-    # with open('grid_experiment.p', 'wb') as fp:
-    #     pickle.dump(g, fp)
-
-    # g.save('grid')
-
-    # with open('section_experiment.p', 'rb') as fp:
-    #     section = pickle.load(fp)
-
-
-    # print 'testing AffineLocalAligner local alignment...'
-    # e = DocExperiment(bills, AffineLocalAligner)
-    # e.evaluate_algorithm()
-
-    # with open('affine_experiment.p', 'wb') as fp:
-    #     pickle.dump(e, fp)
-
-    # e.save('affine_experiment')
-
-    # print 'testing AffineLocalAligner with sections'
-    # e = SectionExperiment(bills, AffineLocalAligner)
-    # e.evaluate_algorithm()
-
-    # with open('affine_section_experiment.p', 'wb') as fp:
-    #     pickle.dump(e, fp)
-
-    # e.save('affine_section_experiment')
-
-   # with open('grid_experiment.p', 'rb') as fp:
-   #      grid = pickle.load(fp)
-
-
-    print 'testing DocLengthExperiment local alignment...'
-    e = DocLengthExperiment(bills, LocalAligner)
-    e.evaluate_algorithm()
-
-    with open('doc_length_experiment.p', 'wb') as fp:
-        pickle.dump(e, fp)
-
-    # e.save('doc_length_experiment')
