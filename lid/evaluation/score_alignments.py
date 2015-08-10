@@ -3,6 +3,7 @@ Functions for scoring alignments
 '''
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import jaccard_similarity_score
 import numpy as np
 from database import *
 
@@ -17,6 +18,10 @@ def weight_tfidf(alignment, state_tfidf, left_state, right_state):
 	f = StateTFIDF(state_tfidf)
 	return np.sum([f.tfidf_score(a, left_state, right_state)*a[0] for a in alignment.alignments])
 
+def jaccard_coefficient(list_of_alignments):
+    jaccard_scores = [jaccard_similarity_score(alignment[1],alignment[2]) for alignment in list_of_alignments]
+    return jaccard_scores
+    
 ####################################################################
 ##tfidf functions
 
@@ -88,3 +93,9 @@ class StateTFIDF():
             return 0
         else:
             return np.mean(scores)
+
+
+
+
+
+
