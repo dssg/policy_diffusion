@@ -25,6 +25,7 @@ from sklearn.metrics import roc_curve, auc
 import seaborn as sns
 #from score_alignments import *
 import random
+from heapq import *
 
 
 #TODO: incorporate plotting into grid code; not sure how to do this in way that works for all algorithms
@@ -33,6 +34,7 @@ class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
                 gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 10, by_section = False):
+
         '''
         total_num : total_num of bills to consider
         '''
@@ -60,7 +62,8 @@ class Experiment():
             bills_to_keep.append(match_group.pop(choice))
 
     	self.bills = {key : bills[key] for key in bills_to_keep}
-    	self.algorithm = algorithm
+    	
+        self.algorithm = algorithm
         if bills == {}:
             self.scores = None
         else:
@@ -548,8 +551,9 @@ class GridSearch():
                                     gap_start {2} gap_extend'.format(match_score, mismatch_score,
                                                                      gap_start, gap_extend)
 
-                            e = DocExperiment(self.bills, LocalAligner, match_score = match_score, 
-                                                mismatch_score = mismatch_score, gap_score = gap_score)
+                            e = DocExperiment(self.bills, AffineLocalAligner, match_score = match_score, 
+                                                mismatch_score = mismatch_score, gap_start = gap_start,
+                                                gap_extend = gap_extend)
 
                             e.evaluate_algorithm()
 
@@ -750,9 +754,14 @@ def roc_experiments(experiments):
         tpr[i] = roc[1]
         roc_auc[i] = auc(fpr[i], tpr[i])
 
+    #find 5 models with largest auc
+    t = zip(range(len(experiments)), roc_auc)
+    best = nlargest(5, t, key=lambda x: x[1])
+    best_experiments = [b[0] for b in best]
+
     # Plot ROC curve
     plt.figure()
-    for i in range(len(experiments)):
+    for i in best_experiments:
         plt.plot(fpr[i], tpr[i], label='ROC curve of algorithm {0} (area = {1:0.2f})'
                                        ''.format(experiments[i][0], roc_auc[i]))
 
