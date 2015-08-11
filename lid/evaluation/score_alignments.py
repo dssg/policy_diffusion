@@ -25,12 +25,10 @@ def jaccard_coefficient(list_of_alignments):
     
     return np.mean(jaccard_scores)
 
-
 def load_word2vec():
     model = Word2Vec.load_word2vec_format('/mnt/data/sunlight/GoogleNews-vectors-negative300.bin', binary=True)
 
     return model
-
 
 def word2vec_similarity(list_of_alignments, model):
     '''
