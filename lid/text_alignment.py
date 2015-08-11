@@ -19,7 +19,8 @@ import re
 import pandas as pd
 import random
 from compiler.ast import flatten
-from utils.utils import find_subsequence
+from sklearn.decomposition import PCA
+from utils.general_utils import find_subsequence
 from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
 from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
@@ -43,6 +44,9 @@ class Alignment(object):
         
         self.alignments = alignments
         self.alignment_indices = alignment_indices
+        self.current = 0
+        self.last = len(self.alignments)
+        
         
     
     def __unicode__(self):
@@ -62,6 +66,31 @@ class Alignment(object):
         
         return output_string
     
+
+    #def __iter__(self):
+    #    return self
+
+    def __getitem__(self, index):
+        d = {"left":self.alignments[index][1],
+                    "right":self.alignments[index][2],
+                    "score":self.alignments[index][0]}
+        d.update(self.alignment_indices[index])
+        return d
+
+
+    #def __next__(self): # Python 3: def __next__(self)
+#
+#        if self.current > self.last:
+#            raise StopIteration
+#        else:
+#            self.current+=1
+#            d = {"left":self.alignments[self.current][1],
+#                    "right":self.alignments[self.current][2],
+#                    "score":self.alignments[self.current][0],
+#                    "indices":self.alignment_indices[self.current]}
+#            return d
+
+
     def __str__(self):
 
         return self.__unicode__().encode("utf-8")

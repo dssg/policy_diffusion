@@ -161,11 +161,6 @@ def clean_document(doc_text,doc_type = "text",split_to_section = False,**kwargs)
     """text -- document text
        doc_type --- the type of the document ( "state_bill", "model_legislation", "None")    """
     
-    if doc_type == "state_bill" and "state_id" not in kwargs:
-        print "need to specify state_id"
-        exit()
-
-
     if doc_type == "state_bill":
         doc_text = clean_text(doc_text)
         doc_text_sections = split_to_sections(doc_text,kwargs['state_id'])
@@ -189,7 +184,7 @@ def clean_document(doc_text,doc_type = "text",split_to_section = False,**kwargs)
     if split_to_section == True:
         return doc_text_sections
     elif split_to_section == False:
-        return " ".join(doc_text_sections)
+        return [" ".join(doc_text_sections)]
 
 #delete boiler plate present in all alec exposed bills after "effective date"
 def delete_boiler_plate_alec_exposed (chunked_list):
