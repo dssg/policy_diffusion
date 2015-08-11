@@ -160,9 +160,8 @@ class ElasticConnection():
 
 
     def get_bill_by_id(self,id):
-        query_body = {"query":{"match":{"unique_id":id}}}
-        match = self.es_connection.search(index = "state_bills",body = query_body)
-        return match['hits']['hits'][0]['_source']
+        match = self.es_connection.get_source(index = "state_bills",id = id)
+        return match
 
         
     def get_all_bills(self, step = 3000):
