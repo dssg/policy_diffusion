@@ -7,7 +7,7 @@ from database import ElasticConnection
 from multiprocessing import Pool
 from text_alignment import LocalAligner
 from utils.text_cleaning import clean_document
-from utils.utils import alignment_tokenizer
+from general_utils import alignment_tokenizer
 import argparse
 import json
 import logging
@@ -16,6 +16,11 @@ import re
 import time
 import traceback
 
+'''custom exception object for LID class'''
+class LidException(Exception):
+    pass
+
+
 
 class LID(object):
     '''LID class that contains all of the central functionality for querying and aligning text between state
@@ -23,7 +28,7 @@ class LID(object):
 
     
     def __init__(self,aligner = LocalAligner(),elastic_host = "localhost",elastic_port=9200,
-            query_results_limit=100,score_threshold = 0.5):
+            query_results_limit=100,lucene_score_threshold = 0.5):
         '''
         alignment_object: any object that inherets from abstract class Alignment
 
@@ -37,67 +42,75 @@ class LID(object):
         self.aligner = aligner
         self.elastic_connection = ElasticConnection(host = elastic_host,port = elastic_port)
         self.results_limit = query_results_limit
-        self.score_threshold = score_threshold
+        self.lucene_score_threshold = lucene_score_threshold
         
     
 
-    def find_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
+    def find_state_bill_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
         '''
         query_document: query document, usually in the form of an entire bill, model legistlation or segment of either
         
         document_type: specifies the document type, default: "text" means that know section chunking will be done
                         on the query, other options include state bill tuples i.e ("state_bill","al")
-                        and "model_legistlation"
+                        and "model_legislation"
 
         split_sections: specifies whether the query document will be broken into sections to find multiple alignments
                         (True) or whether to treat the documents as one and identify a single best alignment (False)
                             
         '''
+
+        if document_type == "state_bill":
+            try:
+                kwargs['state_id']
+                kwargs['query_document_id'] 
+            except KeyError:
+                raise LidException(
+                        "if document type is state_bill then you musy specify state_id and query_document_id")
+
+        elif document_type == "model_legistlation":
+            try:
+                kwargs['query_document_id'] 
+            except KeyError:
+                raise LidException("if document type is model_legistlation then you musy specify query_document_id")
+        
+        elif document_type == "text":
+            kwargs['query_document_id'] = None
+        
+        
         query_document = clean_document(query_document,doc_type = document_type,
                     split_to_section = split_sections, **kwargs)
-
-        if type(query_document) == list:
-            elastic_query = u" ".join(query_document)
-        else:
-            elastic_query = query_document
         
+        elastic_query = u" ".join(query_document)
 
         #query elastic search
         result_docs = self.elastic_connection.similar_doc_query(elastic_query,num_results = self.results_limit,
                 return_fields = ["state","bill_document_last"])
 
-        #run alignment algorithm
-        if split_sections == True:
-            align_doc = [alignment_tokenizer(s) for s in query_document]
-        else:
-            align_doc = alignment_tokenizer(query_document)
+        align_doc = [alignment_tokenizer(s) for s in query_document]
         
-        t_align = 0    
+        alignment_docs = {}
+        alignment_docs['query_document'] = query_document
+        alignment_docs['query_document_id'] = kwargs['query_document_id']
+        alignment_docs['alignment_results'] = []
+
         num_states = 0
-        alignment_docs = []
-        for i,res_doc in enumerate(result_docs):
-            if res_doc['score'] < 0.5:
-                break
-            if res_doc['state'] == kwargs['state_id']:
-                print res_doc['state']
-                num_states+=1
-            print res_doc['score']
-            res_sequence = clean_document(res_doc['bill_document_last'],state_id = res_doc['state'])
-            res_sequence = alignment_tokenizer(res_sequence)
+        for i,result_doc in enumerate(result_docs):
             
-            if split_sections == True:
-                alignment = self.aligner.align_by_section(align_doc,res_sequence)
-            else:
-                alignment = self.aligner.align(align_doc,res_sequence)
-
-            alignment_docs.append(alignment)
+            if result_doc['score'] < self.lucene_score_threshold:
+                break
+            
+            result_sequence = clean_document(result_doc['bill_document_last'],state_id = result_doc['state'])[0]
+            result_sequence = alignment_tokenizer(result_sequence)
+            
+            alignment_obj = self.aligner.align_by_section(align_doc,result_sequence)
+            
+            alignment_doc = {}
+            alignment_doc['alignments'] = [x for x in alignment_obj]
+            alignment_doc['lucene_score'] = result_doc['score']
+            alignment_doc['document_id'] = result_doc['id']
+            alignment_docs['alignment_results'].append(alignment_doc)
         
-        print "num_states",num_states
         return alignment_docs
-
-
-
-
 
 
 

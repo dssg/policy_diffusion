@@ -194,4 +194,6 @@ def extract_model_legislation(json_file, encoded):
             
     else:
         return model_legislation
+
+    
  

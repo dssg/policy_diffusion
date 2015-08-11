@@ -23,8 +23,9 @@ import re
 import csv
 from sklearn.metrics import roc_curve, auc
 import seaborn as sns
-from score_alignments import *
+#from score_alignments import *
 import random
+from heapq import *
 
 
 #TODO: incorporate plotting into grid code; not sure how to do this in way that works for all algorithms
@@ -32,7 +33,8 @@ import random
 class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
-                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 90, by_section = False):
+
         '''
         total_num : total_num of bills to consider
         '''
@@ -51,8 +53,17 @@ class Experiment():
 
                 take -= 1
 
+        #get rest of bills to get total_num of bills
+        left = set([key for key, value in bills.items()]) - set(bills_to_keep)
+        left = list(left)
+
+        for i in range(total_num - len(left)):
+            choice = random.choice(range(len(match_group)))
+            bills_to_keep.append(match_group.pop(choice))
+
     	self.bills = {key : bills[key] for key in bills_to_keep}
-    	self.algorithm = algorithm
+    	
+        self.algorithm = algorithm
         if bills == {}:
             self.scores = None
         else:
@@ -82,45 +93,44 @@ class Experiment():
         returns:
             matrix with scores between all pairs and a dictionary with information
         '''
-        for i in self.bills.keys():
-            for j in self.bills.keys():  
-                if i != j:              
+        param_combs = self._gen_param_combs()
+        for i,j in param_combs:
 
-                    if self.bills[i] == {} or self.bills[j] == {}:
-                        continue
+            if self.bills[i] == {} or self.bills[j] == {}:
+                continue
 
-                    if bills[i]['text'] == '' or bills[j]['text'] == '':
-                        continue
+            if bills[i]['text'] == '' or bills[j]['text'] == '':
+                continue
 
-                    text1 = self._prepare_text_left(bills[i]['text'], bills[i]['state'])
-                    text2 = self._prepare_text_right(bills[j]['text'], bills[j]['state'])
+            text1 = self._prepare_text_left(bills[i]['text'], bills[i]['state'])
+            text2 = self._prepare_text_right(bills[j]['text'], bills[j]['state'])
 
-                    self.results[(i,j)] = {}
-                    self.results[(i,j)]['left_length'] = len(flatten(text1))
-                    self.results[(i,j)]['right_length'] = len(text2)
-                    self.results[(i,j)]['left_state'] = bills[i]['state']
-                    self.results[(i,j)]['right_state'] = bills[j]['state']
+            self.results[(i,j)] = {}
+            self.results[(i,j)]['left_length'] = len(flatten(text1))
+            self.results[(i,j)]['right_length'] = len(text2)
+            self.results[(i,j)]['left_state'] = bills[i]['state']
+            self.results[(i,j)]['right_state'] = bills[j]['state']
 
-                    #instantiate aligner with appropriate parameters
-                    if self.algorithm == LocalAligner:
-                        f = self.algorithm(self.match_score, self.mismatch_score, self.gap_score)
-                    elif self.algorithm == AffineLocalAligner:
-                        f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
+            #instantiate aligner with appropriate parameters
+            if self.algorithm == LocalAligner:
+                f = self.algorithm(self.match_score, self.mismatch_score, self.gap_score)
+            elif self.algorithm == AffineLocalAligner:
+                f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
 
-                    if self.by_section:
-                        alignment = f.align_by_section(text1, text2)
-                    else:
-                        alignment = f.align(text1, text2)
+            if self.by_section:
+                alignment = f.align_by_section(text1, text2)
+            else:
+                alignment = f.align(text1, text2)
 
-                    self.scores[i,j] = self._get_score(alignment, i, j)
+            self.scores[i,j] = self._get_score(alignment, i, j)
 
-                    self.results[(i,j)]['alignments'] = alignment.alignments
-                    self.results[(i,j)]['score'] = self._get_score(alignment, i, j)
-                    self.results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
-                    self.results[(i,j)]['diff'] = [self._diff(a) for a in alignment.alignments]
-                    self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in alignment.alignments]
+            self.results[(i,j)]['alignments'] = alignment.alignments
+            self.results[(i,j)]['score'] = self._get_score(alignment, i, j)
+            self.results[(i,j)]['match'] = (bills[i]['match'] == bills[j]['match'])
+            self.results[(i,j)]['diff'] = [self._diff(a) for a in alignment.alignments]
+            self.results[(i,j)]['features'] = [self._alignment_features(a[1],a[2]) for a in alignment.alignments]
 
-                    print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignment.alignments[0][0])
+            print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignment.alignments[0][0])
 
         return self.scores, self.results
 
@@ -170,6 +180,12 @@ class Experiment():
             with open('../../data/experiment_results/experiment_{0}_m_{1}_mm_{2}_g_{3}.p'.format(self.algorithm._algorithm_name, 
                                 self.match_score, self.mismatch_score, self.gap_score), 'wb') as fp:
                 pickle.dump(self, fp)
+
+
+    @abc.abstractmethod
+    def _gen_param_combs(self):
+        pass
+
 
     @abc.abstractmethod
     def _prepare_text_left(self):
@@ -351,6 +367,17 @@ class Experiment():
 ########################################################################################################################
 class DocExperiment(Experiment):
 
+    def _gen_param_combs(self):
+        keys = self.bills.keys()
+
+        param_combs = []
+        for i in keys:
+            for j in keys:
+                if i < j:
+                    param_combs.append((i,j))
+
+        return param_combs
+
     def _prepare_text_left(self, text, state):
         if state == 'model_legislation':
             text = clean_document(text, doc_type = state)
@@ -410,6 +437,17 @@ class SectionExperiment(Experiment):
     def __init__(self, bills, algorithm):
         Experiment.__init__(self, bills, algorithm)
         self.by_section = True
+
+    def _gen_param_combs(self):
+        keys = self.bills.keys()
+
+        param_combs = []
+        for i in keys:
+            for j in keys:
+                if i != j:
+                    param_combs.append((i,j))
+
+        return param_combs
 
     def _prepare_text_left(self, text, state):
         if state == 'model_legislation':
@@ -486,7 +524,7 @@ class GridSearch():
         self.gap_starts = gap_starts
         self.gap_extends = gap_extends
 
-    def grid_search(self):
+    def evaluate_algorithm(self):
         #only works for doc experiemnt currently
         #determine parameters to do grid search on for given algorithm
         if self.algorithm == LocalAligner:    
@@ -513,8 +551,9 @@ class GridSearch():
                                     gap_start {2} gap_extend'.format(match_score, mismatch_score,
                                                                      gap_start, gap_extend)
 
-                            e = DocExperiment(self.bills, LocalAligner, match_score = match_score, 
-                                                mismatch_score = mismatch_score, gap_score = gap_score)
+                            e = DocExperiment(self.bills, AffineLocalAligner, match_score = match_score, 
+                                                mismatch_score = mismatch_score, gap_start = gap_start,
+                                                gap_extend = gap_extend)
 
                             e.evaluate_algorithm()
 
@@ -715,9 +754,14 @@ def roc_experiments(experiments):
         tpr[i] = roc[1]
         roc_auc[i] = auc(fpr[i], tpr[i])
 
+    #find 5 models with largest auc
+    t = zip(range(len(experiments)), roc_auc)
+    best = nlargest(5, t, key=lambda x: x[1])
+    best_experiments = [b[0] for b in best]
+
     # Plot ROC curve
     plt.figure()
-    for i in range(len(experiments)):
+    for i in best_experiments:
         plt.plot(fpr[i], tpr[i], label='ROC curve of algorithm {0} (area = {1:0.2f})'
                                        ''.format(experiments[i][0], roc_auc[i]))
 
@@ -780,11 +824,13 @@ if __name__ == '__main__':
 
     bills = load_bills()
 
-    e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
+    # e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
 
     # test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
 
-    # test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
+    #test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
+
+    #test_experiment(GridSearch, bills, AffineLocalAligner, 'grid_affine_experiment')
 
     # test_experiment(DocExperiment, bills, AffineLocalAligner, 'affine_local_experiment')
 
@@ -819,4 +865,6 @@ if __name__ == '__main__':
 
     # with open('section_tfidf_experiment.p', 'wb') as fp:
     #     pickle.dump(e, fp)
+
+
 

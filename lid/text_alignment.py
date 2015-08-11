@@ -24,6 +24,11 @@ from utils.general_utils import find_subsequence
 # from alignment.sequence import Sequence
 # from alignment.vocabulary import Vocabulary
 # from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
+# from utils.utils import find_subsequence
+from alignment.sequence import Sequence
+from alignment.vocabulary import Vocabulary
+from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
+
 
 #TODO: use alignment algorithm
 #repsrents two aligned pieces of text
@@ -916,32 +921,32 @@ def clean_alignment(alignment):
 
 
 if __name__ == '__main__':
-    # print "running LocalAligner unit tests.... \n"
-    # LocalAligner_unit_tests()
+    print "running LocalAligner unit tests.... \n"
+    LocalAligner_unit_tests()
 
-    # print "running LocalAligner speed tests.... \n"
-    # LocalAligner_speed_test()
+    print "running LocalAligner speed tests.... \n"
+    LocalAligner_speed_test()
 
-    # print "running LocalAligner index tests.... \n"
-    # doc_test_alignment_indices(LocalAligner)
+    print "running LocalAligner index tests.... \n"
+    doc_test_alignment_indices(LocalAligner)
 
     print "running AffineLocalAligner unit tests.... \n"
     generic_doc_unit_test(AffineLocalAligner)
 
-    # print "running AffineLocalAligner speed tests.... \n"
-    # generic_doc_speed_test(AffineLocalAligner)
+    print "running AffineLocalAligner speed tests.... \n"
+    generic_doc_speed_test(AffineLocalAligner)
 
-    # print "running section unit tests for localaligner.... \n"
-    # section_unit_tests(LocalAligner)
+    print "running section unit tests for localaligner.... \n"
+    section_unit_tests(LocalAligner)
 
     print "running section unit tests for affinealigner.... \n"
     section_unit_tests(AffineLocalAligner)
 
-    # print "running section speed tests.... \n"
-    # section_speed_test()
+    print "running section speed tests.... \n"
+    section_speed_test()
 
-    # print 'running test on keeping track of indices for section algorithm..... \n'
-    # section_test_alignment_indices()
+    print 'running test on keeping track of indices for section algorithm..... \n'
+    section_test_alignment_indices()
 
 
 
