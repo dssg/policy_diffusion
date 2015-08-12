@@ -41,7 +41,7 @@ class ElasticConnection():
         settings_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/state_bill_index.json").read())
 
         print("creating '%s' index..." % (STATE_BILL_INDEX))
-        res = self.es_connection.indices.create(index=STATE_BILL_INDEX, body=settings_doc,timeout=30)
+        res = self.es_connection.indices.create(index=STATE_BILL_INDEX, body=settings_doc)
 
         print("adding mapping for bill_documents")
         res = self.es_connection.indices.put_mapping(index=STATE_BILL_INDEX, doc_type="bill_document",
