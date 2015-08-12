@@ -5,7 +5,9 @@ Functions for scoring alignments
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import jaccard_similarity_score
 import numpy as np
+import scipy as sp
 from database import *
+from gensim.models import Word2Vec
 
 def weight_length(alignment, left_length, right_length):
 	print alignment
@@ -20,8 +22,35 @@ def weight_tfidf(alignment, state_tfidf, left_state, right_state):
 
 def jaccard_coefficient(list_of_alignments):
     jaccard_scores = [jaccard_similarity_score(alignment[1],alignment[2]) for alignment in list_of_alignments]
-    return jaccard_scores
     
+    return np.mean(jaccard_scores)
+
+def load_word2vec():
+    model = Word2Vec.load_word2vec_format('/mnt/data/sunlight/GoogleNews-vectors-negative300.bin', binary=True)
+
+    return model
+
+def word2vec_similarity(list_of_alignments, model):
+    '''
+    model is word2vec model
+    '''
+    distances = []
+    for alignment in list_of_alignments:
+        score, left, right = alignment
+
+        word_distance_list = []
+        for i in range(len(left)):
+            
+            if left[i] not in model or right[i] not in model:
+                continue
+            
+            word_distance_list.append(model.similarity(left[i], right[i]))
+
+        distances.append(np.mean(word_distance_list))
+
+    return np.mean(distances)
+
+        
 ####################################################################
 ##tfidf functions
 
