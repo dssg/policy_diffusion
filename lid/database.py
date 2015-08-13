@@ -114,47 +114,6 @@ class ElasticConnection():
         print i
         self.es_connection.bulk(index=EVALUATION_INDEX, body=bulk_data, timeout=300)
 
-    def similar_doc_query_evaluation(self,query,state_id = None,num_results = 100,return_fields = ["state"]):
-        json_query = """ 
-            {
-                "query": {
-                    "more_like_this": {
-                        "fields": [
-                            "bill_document_last.shingles"
-                        ],
-                        "like_text": "",
-                        "max_query_terms": 25,
-                        "min_term_freq": 1,
-                        "min_doc_freq": 2,
-                        "minimum_should_match": 1
-                    }
-                }
-            }
-        """
-        json_query = json.loads(json_query)
-        json_query['query']['more_like_this']['like_text'] = query
-
-
-        results = self.es_connection.search(index = EVALUATION_INDEX,body = json_query,
-                fields = return_fields,
-                size = num_results )
-        results = results['hits']['hits']
-        result_docs = []
-        for res in results:
-            doc = {}
-            for f in res['fields']:
-                doc[f] = res['fields'][f][0]
-            #doc['state'] = res["fields"]['state'][0]
-            doc['score'] = res['_score']
-            doc['id'] = res['_id']
-            
-            #if applicable, only return docs that are from different states
-            if doc['state'] != state_id:
-                result_docs.append(doc)
-        
-        return result_docs
-
-
     def get_all_doc_ids(self,index):
         count = self.es_connection.count(index)['count']
         q = {"query":{"match_all" :{} },"fields":[]} 
@@ -202,7 +161,8 @@ class ElasticConnection():
 
     
 
-    def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"]):
+    def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"], 
+                            index = STATE_BILL_INDEX):
         json_query = """ 
             {
                 "query": {
@@ -223,7 +183,7 @@ class ElasticConnection():
         json_query['query']['more_like_this']['like_text'] = query
 
 
-        results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
+        results = self.es_connection.search(index = index,body = json_query,
                 fields = return_fields,
                 size = num_results )
         results = results['hits']['hits']
@@ -243,8 +203,8 @@ class ElasticConnection():
         return result_docs
 
 
-    def get_bill_by_id(self,id):
-        match = self.es_connection.get_source(index = "state_bills",id = id)
+    def get_bill_by_id(self,id, index = 'state_bills'):
+        match = self.es_connection.get_source(index = index,id = id)
         return match
 
         
