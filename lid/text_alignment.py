@@ -20,7 +20,7 @@ import pandas as pd
 import random
 from compiler.ast import flatten
 from sklearn.decomposition import PCA
-# from utils.general_utils import find_subsequence
+from utils.general_utils import find_subsequence
 from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
 from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
@@ -180,6 +180,10 @@ class LocalAligner(Aligner):
                 reverse_word_map["-"] = "-" 
                 l = [reverse_word_map[w] for w in l]
                 r = [reverse_word_map[w] for w in r]
+
+                #don't add alignment if it has a score of 0
+                if score == 0:
+                    continue
 
                 alignments.append((score, l, r))
                 
