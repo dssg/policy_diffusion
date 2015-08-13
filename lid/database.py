@@ -25,7 +25,7 @@ MODEL_LEGISLATION_INDEX = "model_legistlation"
 class ElasticConnection():
 
     def __init__(self,host = "localhost",port = 9200):
-        self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 300)
+        self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 1)
 
 
     # creates index for bills and model legislation stored in
