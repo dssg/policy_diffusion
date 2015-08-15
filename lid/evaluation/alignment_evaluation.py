@@ -259,7 +259,7 @@ class Experiment():
         for i in self.bills.keys():
             for j in self.bills.keys():
 
-                if self.results[(i,j)]['score'] == 0:
+                if (i,j) not in self.results or self.results[(i,j)]['score'] == 0:
                     #ignore if score zero because url is broken
                     pass
                 elif i < j and self.results[(i,j)]['match']:
@@ -754,8 +754,9 @@ def roc_experiments(experiments):
         tpr[i] = roc[1]
         roc_auc[i] = auc(fpr[i], tpr[i])
 
+    # best_experiments = range(len(experiments))
     #find 5 models with largest auc
-    t = zip(range(len(experiments)), roc_auc)
+    t = [(key,value)  for key,value in  roc_auc.items()]
     best = nlargest(5, t, key=lambda x: x[1])
     best_experiments = [b[0] for b in best]
 

@@ -20,12 +20,13 @@ import elasticsearch
 #Constants
 STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legistlation"
+EVALUATION_INDEX = "evaluation_texts"
 
 
 class ElasticConnection():
 
     def __init__(self,host = "localhost",port = 9200):
-        self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 300)
+        self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 200)
 
 
     # creates index for bills and model legislation stored in
@@ -40,7 +41,7 @@ class ElasticConnection():
         settings_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/state_bill_index.json").read())
 
         print("creating '%s' index..." % (STATE_BILL_INDEX))
-        res = self.es_connection.indices.create(index=STATE_BILL_INDEX, body=settings_doc,timeout=30)
+        res = self.es_connection.indices.create(index=STATE_BILL_INDEX, body=settings_doc)
 
         print("adding mapping for bill_documents")
         res = self.es_connection.indices.put_mapping(index=STATE_BILL_INDEX, doc_type="bill_document",
@@ -69,8 +70,50 @@ class ElasticConnection():
 
                 del bulk_data
                 bulk_data = []
+
+
+    def create_evaluation_index(self, data_path):
+        if self.es_connection.indices.exists(EVALUATION_INDEX):
+            print("deleting '%s' index..." % (EVALUATION_INDEX))
+            self.es_connection.indices.delete(index=EVALUATION_INDEX)
+
+        #use same mapping as in state index 
+        mapping_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/evaluation_mapping.json").read())
+        settings_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/state_bill_index.json").read())
+
+        print("creating '%s' index..." % (EVALUATION_INDEX))
+        res = self.es_connection.indices.create(index=EVALUATION_INDEX, body=settings_doc,timeout=30)
+
+        print("adding mapping for bill_documents")
+        res = self.es_connection.indices.put_mapping(index=EVALUATION_INDEX, doc_type="bill_document",
+                                                body=mapping_doc)
+
+        bulk_data = []
+        for i, line in enumerate(open(data_path)):
+            json_obj = json.loads(line.strip())
+            if json_obj is None:
+                continue
     
-    
+        bulk_data = []
+        for i, line in enumerate(open(data_path)):
+            json_obj = json.loads(line.strip())
+            if json_obj is None:
+                continue
+
+            op_dict = {
+                "index": {
+                    "_index": EVALUATION_INDEX,
+                    "_type": "bill_document",
+                    "_id": i
+                }
+            }
+
+            bulk_data.append(op_dict)
+            bulk_data.append(json_obj)
+        
+        print i
+        self.es_connection.bulk(index=EVALUATION_INDEX, body=bulk_data, timeout=300)
+
     def get_all_doc_ids(self,index):
         count = self.es_connection.count(index)['count']
         q = {"query":{"match_all" :{} },"fields":[]} 
@@ -118,7 +161,8 @@ class ElasticConnection():
 
     
 
-    def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"]):
+    def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"], 
+                            index = STATE_BILL_INDEX):
         json_query = """ 
             {
                 "query": {
@@ -139,7 +183,7 @@ class ElasticConnection():
         json_query['query']['more_like_this']['like_text'] = query
 
 
-        results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
+        results = self.es_connection.search(index = index,body = json_query,
                 fields = return_fields,
                 size = num_results )
         results = results['hits']['hits']
@@ -159,8 +203,8 @@ class ElasticConnection():
         return result_docs
 
 
-    def get_bill_by_id(self,id):
-        match = self.es_connection.get_source(index = "state_bills",id = id)
+    def get_bill_by_id(self,id, index = 'state_bills'):
+        match = self.es_connection.get_source(index = index,id = id)
         return match
 
         
@@ -316,3 +360,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# b = []
+# for key, value in bills.items():
+#     b.append({})
+#     b[-1]['bill_document_last'] = value['text']
+#     b[-1]['match'] = value['match']
+#     b[-1]['state'] = value['state']
+
+# outFile = codecs.open("/mnt/data/sunlight/dssg/extracted_data/extracted_evaluation_texts.json", 'w')
+# for i, bill in enumerate(b):
+#     outFile.write("{0}\n".format(json.dumps(bill)))
+# outFile.close()
+
