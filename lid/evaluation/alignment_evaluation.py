@@ -33,7 +33,7 @@ from heapq import *
 class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
-                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 90, by_section = False):
+                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 10, by_section = False):
 
         '''
         total_num : total_num of bills to consider
