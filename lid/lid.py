@@ -102,7 +102,7 @@ class LID(object):
             result_sequence = clean_document(result_doc['bill_document_last'],state_id = result_doc['state'])[0]
             result_sequence = alignment_tokenizer(result_sequence)
             
-            alignment_obj = self.aligner.align_by_section(align_doc,result_sequence)
+            alignment_obj = self.aligner.align(align_doc,[result_sequence])
             
             alignment_doc = {}
             alignment_doc['alignments'] = [x for x in alignment_obj]
