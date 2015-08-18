@@ -3,6 +3,8 @@ from text_alignment import *
 from lid import *
 import numpy as np
 import time
+import pickle
+
 
 #constants
 EVALUATION_INDEX = 'evaluation_texts'
@@ -30,9 +32,24 @@ class LIDExperiment():
         self.split_sections = split_sections
         self.time_to_finish = None
         self.lucene_recall = None
+        self.to_save = {}
 
 
-    def evaluate(self):
+    def evaluate_system(self):
+        '''
+        evaluate both alignment and lucene aspects of system
+        '''
+        self.evaluate_alignment()
+        self.evaluate_lucene_score()
+
+        self.to_save['lucene_score_threshold'] = self.lucene_score_threshold
+        self.to_save['query_results_limit'] = self.query_results_limit
+        self.to_save['split_sections'] = self.split_sections
+        self.to_save['time_to_finish'] = self.time_to_finish
+        self.to_save['results'] = self.results
+        self.to_save['lucene_recall'] = self.lucene_recall
+
+    def evaluate_alignment(self):
         start_time = time.time()
         doc_ids = self.lid.elastic_connection.get_all_doc_ids(EVALUATION_INDEX)
         num_bills = len(doc_ids)
@@ -66,6 +83,9 @@ class LIDExperiment():
             for result in alignment_docs['alignment_results']:
 
                 result_id = result['document_id']
+                #we are not interested in case where they are the same
+                if query_id == result_id:
+                    continue
                 #if we already have record and we do not split section, the score is symmetric
                 if not self.split_sections and (result_id, query_id) in self.results:
                     continue
@@ -130,19 +150,20 @@ class LIDExperiment():
 
             print('storing lucene results....')
             for result in evaluation_docs:
-                # print result
 
                 result_id = result['id']
-                #if we already have record and we do not split section, the score is symmetric
-                if not self.split_sections and (result_id, query_id) in self.results:
+                #we are not interested in case where they are the same
+                if query_id == result_id:
                     continue
 
-                self.results[(query_id, result_id)] = {}
                 result_bill = self.lid.elastic_connection.get_bill_by_id(result_id, index = EVALUATION_INDEX)
 
+                if (query_id, result_id) not in self.results:
+                    self.results[(query_id, result_id)] = {}
+
                 self.results[(query_id, result_id)]['match'] = (query_bill['match'] == result_bill['match'])
+                print 'lucene_score: ', result['score']
                 self.results[(query_id, result_id)]['lucene_score'] = result['score']
-                self.results[(query_id, result_id)]['score'] = 0
 
         print('filling in rest of results....')
         for query_id in doc_ids:
@@ -152,10 +173,10 @@ class LIDExperiment():
 
                 if doc_id == query_id:
                     continue
-                if (query_id, doc_id) in self.results or (doc_id, query_id) in self.results:
-                    continue
-                else:
-                    self._add_zero_entry_to_entries(query_id, doc_id, query_bill, doc_bill)
+                if (query_id, doc_id) not in self.results:
+                    self.results[(query_id, doc_id)] = {}
+                    self.results[(query_id, doc_id)]['lucene_score'] = 0
+                    self.results[(query_id, doc_id)]['match'] = (query_bill['match'] == result_bill['match'])
 
         print('calculate lucene recall score....')
         self._calculate_lucene_recall()
@@ -201,8 +222,9 @@ class LIDExperiment():
         plt.show()
 
     def save(self, name):
+
         with open('{0}.p'.format(name), 'wb') as fp:
-            pickle.dump(self, fp)
+            pickle.dump(self.to_save, fp)
 
 ########################################################################################################################
 
@@ -212,7 +234,7 @@ class GridSearch():
                 gap_scores = [-1,-2,-3], gap_starts = [-2,-3,-4], gap_extends = [-0.5,-1,-1.5], 
                 query_results_limit=100, lucene_score_threshold = 0.1, 
                 lucene_score_thresholds = np.arange(0.1,1,0.05)):
-        self.algorithm = aligner
+        self.aligner = aligner
         self.grid = {}
         self.grid_df = None
         self.match_scores = match_scores
@@ -242,12 +264,12 @@ class GridSearch():
 
                         print 'running LocalAligner model: match_score {0} mismatch_score {1} gap_score {2}'.format(match_score, mismatch_score, gap_score)
 
-                        l = LIDExperiment(aligner = LocalAligner(match_score, mismatch_score, gap_score), 
+                        l = LIDExperiment(aligner = self.aligner(match_score, mismatch_score, gap_score), 
                                         lucene_score_threshold = self.lucene_score_threshold)
 
-                        l.evaluate()
+                        l.evaluate_system()
 
-                        self.grid[(match_score, mismatch_score, gap_score)] = l
+                        self.grid[(match_score, mismatch_score, gap_score)] = l.to_save
 
         elif self.aligner == AffineLocalAligner:
             for match_score in self.match_scores:
@@ -259,29 +281,92 @@ class GridSearch():
                                     gap_start {2} gap_extend'.format(match_score, mismatch_score,
                                                                      gap_start, gap_extend)
 
-                            l = LIDExperiment(aligner = AffineLocalAligner(match_score, mismatch_score, gap_start, gap_extend), 
+                            l = LIDExperiment(aligner = self.aligner(match_score, mismatch_score, gap_start, gap_extend), 
                                             lucene_score_threshold = self.lucene_score_threshold)
 
-                            l.evaluate()
+                            l.evaluate_system()
 
-                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)] = l                          
+                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)] = l.to_save                      
 
             return self.grid
+
+
+    def plot_roc(self):
+        experiments = [(str(key), value) for key,value in self.grid.items()]
+        roc_experiments(experiments)
+
 
     def save(self, name):
         with open('{0}.p'.format(name), 'wb') as fp:
             pickle.dump(self, fp)
 
+
+
+############################################################
+##analysis functions
+def roc_experiments(experiments):
+    '''
+    args:
+        experiments : list of tuples where first entry is name of experiment and second entry is experiment object
+    returns:
+        roc plot of all the experiments
+    '''
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(len(experiments)):
+        truth = [value['match'] for key, value in experiments[i][1]['results'].items()]   
+        score = [value['score'] for key, value in experiments[i][1]['results'].items()]
+
+        roc = roc_curve(truth, score)
+        fpr[i] = roc[0]
+        tpr[i] = roc[1]
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # best_experiments = range(len(experiments))
+    #find 5 models with largest auc
+    t = [(key,value)  for key,value in  roc_auc.items()]
+    best = nlargest(5, t, key=lambda x: x[1])
+    best_experiments = [b[0] for b in best]
+
+    # Plot ROC curve
+    plt.figure()
+    for i in best_experiments:
+        plt.plot(fpr[i], tpr[i], label='ROC curve of algorithm {0} (area = {1:0.2f})'
+                                       ''.format(experiments[i][0], roc_auc[i]))
+
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Comparison of ROC curves of multiple experiments')
+    plt.legend(loc="lower right")
+    plt.show()
+
+
+#####
+#other functions
+def load_pickle(name):
+    with open('{0}.p'.format(name),'rb') as fp:
+        f =pickle.load(fp)
+
+    return f
+
 if __name__ == "__main__":
-    g = GridSearch()
-    g.search_lucene_scores()
-    g.save('lucene_grid_experiment')
 
-    l = LIDExperiment()
+    l = LIDExperiment(query_results_limit=1000,lucene_score_threshold = 0.01)
     l.evaluate_lucene_score()
-    l.evaluate()
-    l.save('local_alignment_grid_experiment')
+    l.save('local_alignment_experiment_01_1000')
 
+    # l1 = LIDExperiment(query_results_limit=1000,lucene_score_threshold = 0)
+    # l1.evaluate_lucene_score()
+    # l1.save('local_alignment_experiment_0_1000')
+
+    # g = GridSearch()
+    # g.search_lucene_scores()
+    # g.evaluate_system()
+    # g.save('lucene_grid_experiment')
 
 
 

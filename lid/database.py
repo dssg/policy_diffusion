@@ -26,7 +26,7 @@ EVALUATION_INDEX = "evaluation_texts"
 class ElasticConnection():
 
     def __init__(self,host = "localhost",port = 9200):
-        self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 1)
+        self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 200)
 
 
     # creates index for bills and model legislation stored in
