@@ -28,12 +28,10 @@ import random
 from heapq import *
 
 
-#TODO: incorporate plotting into grid code; not sure how to do this in way that works for all algorithms
-
 class Experiment():
 
     def __init__(self, bills, algorithm, match_score = 3, mismatch_score = -1, 
-                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 90, by_section = False):
+                gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 15):
 
         '''
         total_num : total_num of bills to consider
@@ -74,7 +72,6 @@ class Experiment():
         self.gap_score = gap_score
         self.gap_start = gap_start
         self.gap_extend = gap_extend
-        self.by_section = by_section
 
 
     def evaluate(self):
@@ -117,10 +114,7 @@ class Experiment():
             elif self.algorithm == AffineLocalAligner:
                 f = self.algorithm(self.match_score, self.mismatch_score, self.gap_start, self.gap_extend)
 
-            if self.by_section:
-                alignment = f.align_by_section(text1, text2)
-            else:
-                alignment = f.align(text1, text2)
+            alignment = f.align(text1, text2)
 
             self.scores[i,j] = self._get_score(alignment, i, j)
 
@@ -133,6 +127,7 @@ class Experiment():
             print 'i: ' + str(i) + ', j: ' + str(j) + ' score: ' + str(alignment.alignments[0][0])
 
         return self.scores, self.results
+
 
     def plot_roc_score(self):
         truth = [value['match'] for key, value in self.results.items()]
@@ -153,6 +148,7 @@ class Experiment():
         plt.title('Receiver operating characteristic example')
         plt.legend(loc="lower right")
         plt.show()
+
 
     def plot_roc_matches(self):
         truth = [value['match'] for key, value in self.results.items()]
@@ -192,9 +188,13 @@ class Experiment():
     	pass
 
 
-    @abc.abstractmethod
-    def _prepare_text_right(self):
-        pass
+    def _prepare_text_right(self, text, state):
+        if state == 'model_legislation':
+            text = clean_document(text, doc_type = state)
+        else:
+            text = clean_document(text, doc_type = 'state_bill' , state_id = state)
+
+        return map(lambda x: x.split(), text)
 
 
     @abc.abstractmethod
@@ -384,16 +384,7 @@ class DocExperiment(Experiment):
         else:
             text = clean_document(text, doc_type = 'state_bill' , state_id = state)
 
-        return text.split()
-
-
-    def _prepare_text_right(self, text, state):
-        if state == 'model_legislation':
-            text = clean_document(text, doc_type = state)
-        else:
-            text = clean_document(text, doc_type = 'state_bill' , state_id = state)
-
-        return text.split()
+        return map(lambda x: x.split(), text)
 
 
     def _get_score(self, alignment, i, j):
@@ -408,7 +399,7 @@ class DocLengthExperiment(DocExperiment):
 
 class DocTfidfExperiment(DocExperiment):
     def __init__(self, bills, algorithm, state_tfidf, match_score = 3, mismatch_score = -1, 
-            gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+            gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20):
         '''
         total_num : total_num of bills to consider
         '''
@@ -424,7 +415,6 @@ class DocTfidfExperiment(DocExperiment):
         self.gap_score = gap_score
         self.gap_start = gap_start
         self.gap_extend = gap_extend
-        self.by_section = by_section
         self.state_tfidf = state_tfidf
 
     def _get_score(self, alignment, i, j):
@@ -434,9 +424,6 @@ class DocTfidfExperiment(DocExperiment):
 
 ########################################################################################################################
 class SectionExperiment(Experiment):
-    def __init__(self, bills, algorithm):
-        Experiment.__init__(self, bills, algorithm)
-        self.by_section = True
 
     def _gen_param_combs(self):
         keys = self.bills.keys()
@@ -457,14 +444,6 @@ class SectionExperiment(Experiment):
 
         return map(lambda x: x.split(), text)
 
-    def _prepare_text_right(self, text, state):
-        if state == 'model_legislation':
-            text = clean_document(text, doc_type = state)
-        else:
-            text = clean_document(text, doc_type = 'state_bill' , state_id = state)
-
-        return text.split()
-
     def _get_score(self, alignment, i, j):
 
         scores = [score for score, left, right in alignment.alignments]
@@ -482,7 +461,7 @@ class SectionLengthExperiment(SectionExperiment):
 
 class SectionTfidfExperiment(SectionExperiment):
     def __init__(self, bills, algorithm, state_tfidf, match_score = 3, mismatch_score = -1, 
-            gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20, by_section = False):
+            gap_score = -2, gap_start = -5, gap_extend = -0.5, total_num = 20):
         '''
         total_num : total_num of bills to consider
         '''
@@ -498,7 +477,6 @@ class SectionTfidfExperiment(SectionExperiment):
         self.gap_score = gap_score
         self.gap_start = gap_start
         self.gap_extend = gap_extend
-        self.by_section = by_section
         self.state_tfidf = state_tfidf
 
     def _get_score(self, alignment, i, j):
@@ -557,9 +535,7 @@ class GridSearch():
 
                             e.evaluate_algorithm()
 
-                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)] = {}                            
-                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)]['results'] = e.results
-                            self.grid[(match_score, mismatch_score, gap_start, gap_extend)]['scores'] = e.scores                            
+                            self.grid[(match_score, mismatch_score, gap_score)] = e                          
 
             return self.grid
 
@@ -825,9 +801,9 @@ if __name__ == '__main__':
 
     bills = load_bills()
 
-    # e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
+    e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
 
-    # test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
+    test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
 
     #test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
 
@@ -868,4 +844,44 @@ if __name__ == '__main__':
     #     pickle.dump(e, fp)
 
 
+########################################################################################################################
+########################################################################################################################
+#code to plot roc curves for bad version of affine experiment
+
+
+
+# experiments = [(str(key), value['results']) for key,value in self.grid.items()]
+
+# fpr = dict()
+# tpr = dict()
+# roc_auc = dict()
+# for i in range(len(experiments)):
+#     truth = [value['match'] for key, value in experiments[i][1].items()]   
+#     score = [value['score'] for key, value in experiments[i][1].items()]
+
+#     roc = roc_curve(truth, score)
+#     fpr[i] = roc[0]
+#     tpr[i] = roc[1]
+#     roc_auc[i] = auc(fpr[i], tpr[i])
+
+# # best_experiments = range(len(experiments))
+# #find 5 models with largest auc
+# t = [(key,value)  for key,value in  roc_auc.items()]
+# best = nlargest(5, t, key=lambda x: x[1])
+# best_experiments = [b[0] for b in best]
+
+# # Plot ROC curve
+# plt.figure()
+# for i in best_experiments:
+#     plt.plot(fpr[i], tpr[i], label='ROC curve of algorithm {0} (area = {1:0.2f})'
+#                                    ''.format(experiments[i][0], roc_auc[i]))
+
+# plt.plot([0, 1], [0, 1], 'k--')
+# plt.xlim([0.0, 1.0])
+# plt.ylim([0.0, 1.05])
+# plt.xlabel('False Positive Rate')
+# plt.ylabel('True Positive Rate')
+# plt.title('Comparison of ROC curves of multiple experiments')
+# plt.legend(loc="lower right")
+# plt.show()
 
