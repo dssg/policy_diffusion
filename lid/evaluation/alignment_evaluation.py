@@ -15,7 +15,7 @@ from urllib import urlopen
 import re
 import pandas as pd
 from sklearn.decomposition import PCA
-#from text_alignment import *    
+from text_alignment import *    
 from text_cleaning import clean_document
 from compiler.ast import flatten
 from elasticsearch import Elasticsearch
@@ -26,6 +26,8 @@ import seaborn as sns
 #from score_alignments import *
 import random
 from heapq import *
+from sklearn.metrics import jaccard_similarity_score
+
 
 
 class Experiment():
@@ -614,6 +616,7 @@ def alignment_features(left, right):
     features['avg_gap_length_l'] = []
     features['avg_gap_length_r'] = []
     features['avg_consec_match_length'] = []
+    features['jaccard_score'] = jaccard_similarity_score(left,right)
 
     #helper variables
     prev_gap_l = False
@@ -804,7 +807,7 @@ if __name__ == '__main__':
 
     e = test_experiment(DocExperiment, bills, LocalAligner, 'local_experiment')
 
-    #test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
+    test_experiment(SectionExperiment, bills, LocalAligner, 'section_local_experiment')
 
     #test_experiment(GridSearch, bills, LocalAligner, 'grid_local_experiment')
 
