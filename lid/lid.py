@@ -7,7 +7,7 @@ from database import ElasticConnection
 from multiprocessing import Pool
 from text_alignment import LocalAligner
 from utils.text_cleaning import clean_document
-from general_utils import alignment_tokenizer
+from utils.general_utils import alignment_tokenizer
 import argparse
 import json
 import logging
@@ -115,6 +115,128 @@ class LID(object):
             alignment_docs['alignment_results'].append(alignment_doc)
         
         return alignment_docs
+
+
+    def find_evaluation_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
+        '''
+        query_document: query document, usually in the form of an entire bill, model legistlation or segment of either
+        
+        document_type: specifies the document type, default: "text" means that know section chunking will be done
+                        on the query, other options include state bill tuples i.e ("state_bill","al")
+                        and "model_legislation"
+
+        split_sections: specifies whether the query document will be broken into sections to find multiple alignments
+                        (True) or whether to treat the documents as one and identify a single best alignment (False)
+                            
+        '''
+
+        if document_type == "state_bill":
+            try:
+                kwargs['state_id']
+                kwargs['query_document_id'] 
+            except KeyError:
+                raise LidException(
+                        "if document type is state_bill then you musy specify state_id and query_document_id")
+
+        elif document_type == "model_legistlation":
+            try:
+                kwargs['query_document_id'] 
+            except KeyError:
+                raise LidException("if document type is model_legistlation then you musy specify query_document_id")
+        
+        elif document_type == "text":
+            kwargs['query_document_id'] = None
+        
+        
+        query_document = clean_document(query_document,doc_type = document_type,
+                    split_to_section = split_sections, **kwargs)
+        
+        elastic_query = u" ".join(query_document)
+
+        #query elastic search
+        result_docs = self.elastic_connection.similar_doc_query(elastic_query,num_results = self.results_limit,
+                return_fields = ["state","bill_document_last"], index = "evaluation_texts")
+
+        align_doc = [alignment_tokenizer(s) for s in query_document]
+        # print 'align_doc: ', align_doc
+        
+        alignment_docs = {}
+        alignment_docs['query_document'] = query_document
+        alignment_docs['query_document_id'] = kwargs['query_document_id']
+        alignment_docs['alignment_results'] = []
+
+        num_states = 0
+        for i,result_doc in enumerate(result_docs):
+            
+            if result_doc['score'] < self.lucene_score_threshold:
+                break
+            
+            result_sequence = clean_document(result_doc['bill_document_last'],state_id = result_doc['state'])
+            # print 'result_sequence: ', result_sequence
+
+            result_sequence = [alignment_tokenizer(s) for s in result_sequence]
+            
+            alignment_obj = self.aligner.align(align_doc,result_sequence)
+            
+            alignment_doc = {}
+            alignment_doc['alignments'] = [x for x in alignment_obj]
+            alignment_doc['lucene_score'] = result_doc['score']
+            alignment_doc['document_id'] = result_doc['id']
+            alignment_docs['alignment_results'].append(alignment_doc)
+        
+        return alignment_docs
+
+
+    def find_evaluation_texts(self,query_document,document_type = "text",split_sections = False,**kwargs):
+        '''
+        description: for evaluating lucene score threshold
+
+        query_document: query document, usually in the form of an entire bill, model legistlation or segment of either
+        
+        document_type: specifies the document type, default: "text" means that know section chunking will be done
+                        on the query, other options include state bill tuples i.e ("state_bill","al")
+                        and "model_legislation"
+
+        split_sections: specifies whether the query document will be broken into sections to find multiple alignments
+                        (True) or whether to treat the documents as one and identify a single best alignment (False)
+                            
+        '''
+
+        if document_type == "state_bill":
+            try:
+                kwargs['state_id']
+                kwargs['query_document_id'] 
+            except KeyError:
+                raise LidException(
+                        "if document type is state_bill then you musy specify state_id and query_document_id")
+
+        elif document_type == "model_legistlation":
+            try:
+                kwargs['query_document_id'] 
+            except KeyError:
+                raise LidException("if document type is model_legistlation then you musy specify query_document_id")
+        
+        elif document_type == "text":
+            kwargs['query_document_id'] = None
+        
+        query_document = clean_document(query_document,doc_type = document_type,
+                    split_to_section = split_sections, **kwargs)
+        
+        elastic_query = u" ".join(query_document)
+
+        #query elastic search
+        result_docs = self.elastic_connection.similar_doc_query(elastic_query,num_results = self.results_limit,
+                return_fields = ["state","bill_document_last"], index = "evaluation_texts")
+
+        results = []
+        for i,result_doc in enumerate(result_docs):
+
+            if result_doc['score'] < self.lucene_score_threshold:
+                break
+
+            results.append(result_doc)
+        
+        return results
 
 
 
