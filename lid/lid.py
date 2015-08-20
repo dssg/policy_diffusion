@@ -95,7 +95,11 @@ class LID(object):
 
         num_states = 0
         for i,result_doc in enumerate(result_docs):
+            #print i,result_doc['score'],result_doc['state']
             
+            if result_doc['state'] == kwargs['state_id']:
+                continue
+
             if result_doc['score'] < self.lucene_score_threshold:
                 break
             
