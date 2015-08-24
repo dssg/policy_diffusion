@@ -3,7 +3,81 @@ import numpy as np
 import nltk
 from sklearn import linear_model
 from sklearn.metrics import confusion_matrix, accuracy_score
-import csv
+
+from score_alignments import StateTFIDF
+import json
+import argparse
+import os
+from database import ElasticConnection
+import random
+import codecs
+from utils.general_utils import alignment_tokenizer
+from utils.general_utils import UnicodeWriter
+
+
+def construct_training_set(alignments_file,out_file_name):
+    """
+    Args:
+        alignments_file (file) -- file containing sample alignments
+        
+        out_file_name (string) -- name of training data file to write to
+
+    Returns:
+        None
+    """
+    ec = ElasticConnection(host= "54.203.12.145")
+    
+    training_examples = []
+    for i,x in enumerate(alignments_file):
+        json_obj = json.loads(x.strip())
+        
+        if "alignment_results" not in json_obj.keys():
+            continue
+
+        left_doc_id = json_obj['query_document_id']
+        left_bill_title = ec.get_bill_by_id(left_doc_id)['bill_title']
+        
+        left_doc = json_obj['query_document']
+        left_doc = reduce(lambda x,y:x+y,left_doc)
+        
+        left_doc_length = len(left_doc.split())
+
+        for i,alignment_doc in enumerate(json_obj['alignment_results']):
+            
+            right_doc_id = alignment_doc['document_id']
+            right_bill_title = ec.get_bill_by_id(right_doc_id)['bill_title']
+            
+            for alignment in alignment_doc['alignments']:
+
+                left = alignment['left']
+                right = alignment['right']
+                left_start = alignment['left_start'] 
+                right_start = alignment['right_start']
+                left_end = alignment['left_end']
+                right_end = alignment['right_end']
+                score = alignment['score']
+                training_examples.append([left_doc_id,right_doc_id,left_doc_length,left_start,right_start,left_end,
+                    right_end,score,left_bill_title,right_bill_title,
+                    " ".join(left)," ".join(right)])
+        
+    
+    random.shuffle(training_examples)            
+    
+    header = ["left_doc_id","right_doc_id","left_doc_length","left_start","right_start","left_end",
+                    "right_end","score","left_bill_title","right_bill_title","left","right"]
+   
+
+    k = 500
+    with codecs.open(out_file_name, 'wb') as output_file:
+        writer =  UnicodeWriter(output_file, header)
+        writer.writerow(header)
+        for l in training_examples[0:k]:
+            l = [unicode(x) for x in l]
+            writer.writerow(l)
+
+
+    return
+=======
 from score_alignments import StateTFIDF
 import json
 import argparse
@@ -79,10 +153,10 @@ def construct_training_set(alignments_file,out_file_name):
     return
 
 
-
 def features_matrix(alignment):
 	right = alignment['right']
 	left = alignment['left']
+	features['left_tfidf'], features['right_tfidf'] = s.tfidf_score(left, right)
 	features = alignment_features(left, right)
 	features['score'] = alignment['score']
 	features['label'] = alignment['label']

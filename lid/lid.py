@@ -187,8 +187,11 @@ class LID(object):
         return alignment_docs
 
 
-    def find_evaluation_texts(self,query_document,document_type = "text",split_sections = False,**kwargs):
+    def find_evaluation_texts(self,query_document, match_group, document_type = "text",split_sections = False,**kwargs):
         '''
+        match_group represents the group of bills that an evaluation bill 
+        belongs to (e.g., all the stand your ground bills)
+
         description: for evaluating lucene score threshold
 
         query_document: query document, usually in the form of an entire bill, model legistlation or segment of either
@@ -225,8 +228,17 @@ class LID(object):
         elastic_query = u" ".join(query_document)
 
         #query elastic search
-        result_docs = self.elastic_connection.similar_doc_query(elastic_query,num_results = self.results_limit,
-                return_fields = ["state","bill_document_last"], index = "evaluation_texts")
+        result_docs = self.elastic_connection.similar_doc_query_for_testing_lucene(elastic_query,
+                                                match_group,
+                                                num_results = self.results_limit,
+                                                return_fields = ["state","bill_document_last"], 
+                                                index = "evaluation_bills_all_bills")
+
+        # result_docs = self.elastic_connection.similar_doc_query(elastic_query,
+        #                                         num_results = self.results_limit,
+        #                                         return_fields = ["state","bill_document_last"], 
+        #                                         index = "evaluation_bills_all_bills")
+
 
         results = []
         for i,result_doc in enumerate(result_docs):
@@ -239,6 +251,56 @@ class LID(object):
         return results
 
 
+    # def find_evaluation_texts_full_text(self,query_document,document_type = "text",split_sections = False,**kwargs):
+    #     '''
+    #     description: for evaluating lucene score threshold
+
+    #     query_document: query document, usually in the form of an entire bill, model legistlation or segment of either
+        
+    #     document_type: specifies the document type, default: "text" means that know section chunking will be done
+    #                     on the query, other options include state bill tuples i.e ("state_bill","al")
+    #                     and "model_legislation"
+
+    #     split_sections: specifies whether the query document will be broken into sections to find multiple alignments
+    #                     (True) or whether to treat the documents as one and identify a single best alignment (False)
+                            
+    #     '''
+
+    #     if document_type == "state_bill":
+    #         try:
+    #             kwargs['state_id']
+    #             kwargs['query_document_id'] 
+    #         except KeyError:
+    #             raise LidException(
+    #                     "if document type is state_bill then you musy specify state_id and query_document_id")
+
+    #     elif document_type == "model_legistlation":
+    #         try:
+    #             kwargs['query_document_id'] 
+    #         except KeyError:
+    #             raise LidException("if document type is model_legistlation then you musy specify query_document_id")
+        
+    #     elif document_type == "text":
+    #         kwargs['query_document_id'] = None
+        
+    #     query_document = clean_document(query_document,doc_type = document_type,
+    #                 split_to_section = split_sections, **kwargs)
+        
+    #     elastic_query = u" ".join(query_document)
+
+    #     #query elastic search
+    #     result_docs = self.elastic_connection.es_connection.search(q=elastic_query,size = self.results_limit,
+    #                                                             index = "evaluation_texts")['hits']['hits']
+
+    #     results = []
+    #     for i,result_doc in enumerate(result_docs):
+
+    #         if result_doc['score'] < self.lucene_score_threshold:
+    #             break
+
+    #         results.append(result_doc)
+        
+    #     return results
 
 #Below are functions that use lid objects to identify similar bills/model legislation in the dataset,
 #will be moved to another module in the next version

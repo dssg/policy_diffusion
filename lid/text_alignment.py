@@ -157,6 +157,16 @@ class LocalAligner(Aligner):
         return "{0}: {1}, {2}, {3}".format(name_str,param_str_1,param_str_2,param_str_3)
 
     def align(self, left_sections, right_sections):
+        '''
+        description:
+            find alignments between two documents
+        args:
+            left_sections: a list of lists of words
+            right_sections: a list of lists of words (usually just a list of a list of words)
+
+        returns:
+            alignment object
+        '''
         
         alignments = []
         alignment_indices = []
@@ -202,6 +212,20 @@ class LocalAligner(Aligner):
 
     @jit
     def _compute_matrix(self, left, right, match_score, mismatch_score, gap_score):
+        '''
+        description:
+            create matrix of optimal scores
+        args:
+            left: an array of integers
+            right: an array of integers
+            match_score: score for match in alignment
+            mismatch_score: score for mismatch in alignment
+            gap_score: score for gap in alignment
+        returns:
+            matrix representing optimal score for subsequences ending at each index
+            pointer_matrix for reconstructing a solution
+
+        '''
 
         m = len(left) + 1
         n = len(right) + 1
@@ -230,6 +254,21 @@ class LocalAligner(Aligner):
 
     @jit
     def _backtrace(self, left, right, score_matrix, pointer_matrix):
+
+        '''
+        description:
+            backtrace for recovering solution from dp matrix
+        args:
+            left: an array of integers
+            right: an array of integers
+            matrix representing optimal score for subsequences ending at each index
+            pointer_matrix for reconstructing a solution
+        returns:
+            left_alignment: array of integers
+            right_alignment: array of integers
+            score: score of alignment
+            align_index: dictionary with indices of where alignment occurs in left and right
+        '''
 
         i,j = np.unravel_index(score_matrix.argmax(), score_matrix.shape)
 
@@ -271,6 +310,17 @@ class LocalAligner(Aligner):
         return left_alignment, right_alignment, score, align_index
 
     def alignment_score(self, l, r):
+        '''
+        description:
+            computes the score of an alignment using the scoring
+            used for checking algorithm
+        args:
+            l: list of words
+            r: list of words
+        returns:
+            score: number
+
+        '''
         score = 0
         for i in range(len(l)):
             if l[i] == r[i]:

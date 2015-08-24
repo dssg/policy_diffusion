@@ -8,6 +8,8 @@ import numpy as np
 import scipy as sp
 from database import *
 from gensim.models import Word2Vec
+from utils.general_utils import save_pickle
+import json
 
 def weight_length(alignment, left_length, right_length):
 	print alignment
@@ -56,15 +58,36 @@ def word2vec_similarity(list_of_alignments, model):
 def tfidf_by_state(state, num_bills = 'all'):
     '''
     description:
-        create dictionary of tfidf scores for a particular
+        create dictionary of tfidf scores for a particular state
     args:
-        state
         num_bills: number of bills to run the algorithm open
     returns:
         dictionary of tfidf scores with words as keys
     '''
     es = ElasticConnection()
     state_bills = es.get_bills_by_state(state, num_bills)
+    corpus = [bill['_source']['bill_document_last'] for bill in state_bills \
+            if bill['_source']['bill_document_last'] != None]
+
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(corpus)
+    idf = vectorizer.idf_
+    idf = vectorizer._tfidf.idf_
+
+    return dict(zip(vectorizer.get_feature_names(), idf))
+
+
+def tfidf_all_bills():
+    '''
+    description:
+        create dictionary of tfidf scores for a particular state
+    args:
+        num_bills: number of bills to run the algorithm open
+    returns:
+        dictionary of tfidf scores with words as keys
+    '''
+    es = ElasticConnection()
+    state_bills = es.get_all_bills()
     corpus = [bill['_source']['bill_document_last'] for bill in state_bills \
             if bill['_source']['bill_document_last'] != None]
 
@@ -106,23 +129,33 @@ class StateTFIDF():
         else:
             return self.state_tfidf[state][word]
 
-    def tfidf_score(self, alignment, left_state, right_state):
+    def tfidf_score(self, left, right, left_state, right_state):
     	'''
-    	gives average tfidf for a particular alignment
+    	gives average tfidf for a particular left and right components of alignment
     	'''
-        scores = []
-        score, left, right = alignment 
+        left_scores = []
+        right_scores = [] 
 
         for i in range(len(left)):
-            scores.append(self.find_tfidf(left[i], left_state)) #need function
-            scores.append(self.find_tfidf(right[i], right_state))
+            left_scores.append(self.find_tfidf(left[i], left_state)) #need function
+            right_scores.append(self.find_tfidf(right[i], right_state))
 
         if scores == []:
             return 0
         else:
-            return np.mean(scores)
+            return np.mean(left_scores), np.mean(right_scores)
 
 
+def tfidf_by_alignments():
+    alignments = []
+    with open('bill_to_bill_alignments.txt') as f:
+        for i,line in enumerate(f):
+            print 'line ', i
+            alignments.append(json.loads(line))
+
+if __name__ == "__main__":
+    tfidf = tfidf_all_bills()
+    save_pickle(tfidf, 'tfidf_all_bills')
 
 
 

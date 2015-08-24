@@ -8,7 +8,15 @@ import pickle
 
 #constants
 EVALUATION_INDEX = 'evaluation_texts'
+EVALUATION_INDEX_ALL_BILLS = "evaluation_bills_all_bills"
 
+
+def is_float(value):
+    try: 
+        float(value)
+        return True
+    except:
+        return False
 
 def alignment_mean(alignments):
     '''
@@ -18,7 +26,7 @@ def alignment_mean(alignments):
 
 class LIDExperiment():
     def __init__(self, aligner = LocalAligner(), get_score = alignment_mean, 
-                split_sections = False, query_results_limit=100,lucene_score_threshold = 0.1):
+                split_sections = False, query_results_limit=100, lucene_score_threshold = 0.1):
         '''
 		get_score is way to aggregate to document level from multiple alignments
         '''
@@ -51,7 +59,8 @@ class LIDExperiment():
 
     def evaluate_alignment(self):
         start_time = time.time()
-        doc_ids = self.lid.elastic_connection.get_all_doc_ids(EVALUATION_INDEX)
+        doc_ids = [doc_id for doc_id in self.lid.elastic_connection.get_all_doc_ids(EVALUATION_INDEX) \
+                 if is_float(doc_id)]
         num_bills = len(doc_ids)
         for query_id in doc_ids:
 
@@ -129,22 +138,25 @@ class LIDExperiment():
         '''
         evaluate recall of lucene score
         '''
-        doc_ids = self.lid.elastic_connection.get_all_doc_ids(EVALUATION_INDEX)
+        doc_ids = [doc_id for doc_id in self.lid.elastic_connection.get_all_doc_ids(EVALUATION_INDEX_ALL_BILLS) \
+                 if is_float(doc_id)]
         num_bills = len(doc_ids)
         for query_id in doc_ids:
 
-            query_bill = self.lid.elastic_connection.get_bill_by_id(query_id, index = EVALUATION_INDEX)
+            query_bill = self.lid.elastic_connection.get_bill_by_id(query_id, index = EVALUATION_INDEX_ALL_BILLS)
             query_text = query_bill['bill_document_last']
 
             print('working on query_id {0}....'.format(query_id))
             print('completed {0:.2f}%'.format((float(query_id)+1)/num_bills))
 
             if query_bill['state'] == 'model_legislation':
-                evaluation_docs = self.lid.find_evaluation_texts(query_text, document_type = "model_legislation",
+                evaluation_docs = self.lid.find_evaluation_texts(query_text, query_bill['match'],
+                                                        document_type = "model_legislation",
                                                         query_document_id = query_id,
                                                         split_sections = self.split_sections)
             else:
-                evaluation_docs = self.lid.find_evaluation_texts(query_text, document_type = "state_bill", 
+                evaluation_docs = self.lid.find_evaluation_texts(query_text, query_bill['match'], 
+                                                        document_type = "state_bill", 
                                                         state_id = query_bill['state'], query_document_id = query_id,
                                                         split_sections = self.split_sections)
 
@@ -156,27 +168,33 @@ class LIDExperiment():
                 if query_id == result_id:
                     continue
 
-                result_bill = self.lid.elastic_connection.get_bill_by_id(result_id, index = EVALUATION_INDEX)
+                result_bill = self.lid.elastic_connection.get_bill_by_id(result_id, index = EVALUATION_INDEX_ALL_BILLS)
 
                 if (query_id, result_id) not in self.results:
                     self.results[(query_id, result_id)] = {}
 
-                self.results[(query_id, result_id)]['match'] = (query_bill['match'] == result_bill['match'])
+                try:
+                    self.results[(query_id, result_id)]['match'] = (query_bill['match'] == result_bill['match'])
+                except:
+                    pass
                 print 'lucene_score: ', result['score']
                 self.results[(query_id, result_id)]['lucene_score'] = result['score']
 
         print('filling in rest of results....')
         for query_id in doc_ids:
-            query_bill = self.lid.elastic_connection.get_bill_by_id(query_id, index = EVALUATION_INDEX)
-            for doc_id in doc_ids:
-                doc_bill = self.lid.elastic_connection.get_bill_by_id(doc_id, index = EVALUATION_INDEX)
+            query_bill = self.lid.elastic_connection.get_bill_by_id(query_id, index = EVALUATION_INDEX_ALL_BILLS)
+            for result_id in doc_ids:
+                result_bill = self.lid.elastic_connection.get_bill_by_id(result_id, index = EVALUATION_INDEX_ALL_BILLS)
 
-                if doc_id == query_id:
+                if result_id == query_id:
                     continue
-                if (query_id, doc_id) not in self.results:
-                    self.results[(query_id, doc_id)] = {}
-                    self.results[(query_id, doc_id)]['lucene_score'] = 0
-                    self.results[(query_id, doc_id)]['match'] = (query_bill['match'] == result_bill['match'])
+                if (query_id, result_id) not in self.results:
+                    self.results[(query_id, result_id)] = {}
+                    self.results[(query_id, result_id)]['lucene_score'] = 0
+                    try:
+                        self.results[(query_id, result_id)]['match'] = (query_bill['match'] == result_bill['match'])
+                    except:
+                        pass
 
         print('calculate lucene recall score....')
         self._calculate_lucene_recall()
@@ -185,7 +203,7 @@ class LIDExperiment():
     def _calculate_lucene_recall(self):
         lucene_recall = []
         for key,value in self.results.items():
-            if value['match'] == 1:
+            if 'match' in value and value['match'] == 1:
                 if value['lucene_score'] < self.lucene_score_threshold:
                     lucene_recall.append(0)
                 else:
@@ -232,7 +250,7 @@ class GridSearch():
 
     def __init__(self, aligner = LocalAligner, match_scores = [2,3,4], mismatch_scores = [-1,-2,-3], 
                 gap_scores = [-1,-2,-3], gap_starts = [-2,-3,-4], gap_extends = [-0.5,-1,-1.5], 
-                query_results_limit=100, lucene_score_threshold = 0.1, 
+                query_results_limit=100, query_results_limits = np.arange(100,1100,100), lucene_score_threshold = 0.01, 
                 lucene_score_thresholds = np.arange(0.1,1,0.05)):
         self.aligner = aligner
         self.grid = {}
@@ -245,14 +263,24 @@ class GridSearch():
         self.lucene_score_performance = {}
         self.lucene_score_threshold = lucene_score_threshold
         self.lucene_score_thresholds = lucene_score_thresholds
+        self.query_results_limits = query_results_limits
+        self.query_limits_performance = {}
+
 
 
     def search_lucene_scores(self):
         for lucene_score in self.lucene_score_thresholds:
             print('working on lucene score {0}....'.format(lucene_score))
-            l = LIDExperiment(lucene_score_threshold = lucene_score)
+            l = LIDExperiment(lucene_score_threshold = lucene_score, query_results_limit = self.query_results_limit)
             l.evaluate_lucene_score()
             self.lucene_score_performance[lucene_score] = l.lucene_recall
+
+    def search_lucene_limits(self):
+        for limit in self.query_results_limits:
+            print('working on lucene query limit {0}....'.format(limit))
+            l = LIDExperiment(query_results_limit = limit, lucene_score_threshold = self.lucene_score_threshold)
+            l.evaluate_lucene_score()
+            self.query_limits_performance[limit] = l.lucene_recall
 
     def evaluate_system(self):
         #only works for doc experiemnt currently
@@ -359,14 +387,10 @@ if __name__ == "__main__":
     l.evaluate_lucene_score()
     l.save('local_alignment_experiment_01_1000')
 
-    # l1 = LIDExperiment(query_results_limit=1000,lucene_score_threshold = 0)
-    # l1.evaluate_lucene_score()
-    # l1.save('local_alignment_experiment_0_1000')
 
-    # g = GridSearch()
-    # g.search_lucene_scores()
-    # g.evaluate_system()
-    # g.save('lucene_grid_experiment')
+    g = GridSearch()
+    g.search_lucene_limits()
+    g.save('lucene_limit_grid_experiment')
 
 
 
