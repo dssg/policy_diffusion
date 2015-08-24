@@ -23,9 +23,7 @@ from utils.general_utils import find_subsequence
 from alignment.sequence import Sequence
 from alignment.vocabulary import Vocabulary
 from alignment.sequencealigner import SimpleScoring, LocalSequenceAligner
-from gensim.models import Word2Vec
-from evaluation.score_alignments import load_word2vec
-from scipy.spatial.distance import cosine
+
 
 
 #TODO: use alignment algorithm
@@ -66,28 +64,12 @@ class Alignment(object):
         return output_string
     
 
-    #def __iter__(self):
-    #    return self
-
     def __getitem__(self, index):
         d = {"left":self.alignments[index][1],
                     "right":self.alignments[index][2],
                     "score":self.alignments[index][0]}
         d.update(self.alignment_indices[index])
         return d
-
-
-    #def __next__(self): # Python 3: def __next__(self)
-#
-#        if self.current > self.last:
-#            raise StopIteration
-#        else:
-#            self.current+=1
-#            d = {"left":self.alignments[self.current][1],
-#                    "right":self.alignments[self.current][2],
-#                    "score":self.alignments[self.current][0],
-#                    "indices":self.alignment_indices[self.current]}
-#            return d
 
 
     def __str__(self):
@@ -99,9 +81,16 @@ class Alignment(object):
 
     def annotate_alignment(self):
         pass
-    
+
 
 class Aligner(object):
+    '''
+    Aligner is an abstract class for Aligner algorithms.
+
+    Attributes:
+        _transform_text: converts two lists of words into two numpy arrays
+        align: abstract method for alignment
+    '''
 
     def __init__(self):
         if not self._algorithm_name:
@@ -136,8 +125,19 @@ class Aligner(object):
 ########################################################################################################################
 
 class LocalAligner(Aligner):
+    '''
+    LocalAligner is a class for performing the Smith-Waterman algorithm on two documents.
+
+    Attributes:
+        match_score: match score for Smith-Waterman algorithm
+        mismatch_score: mismatch score for Smith-Waterman algorithm
+        gap_score: gap score for Smith-Waterman algorithm
+    '''
 
     def __init__(self,match_score = 3,mismatch_score = -1,gap_score = -2):
+        '''
+        inits LocalAligner with match_score, mismatch_score, gap_score
+        '''
         
         self._algorithm_name = "local_alignment"
         
@@ -224,7 +224,6 @@ class LocalAligner(Aligner):
         returns:
             matrix representing optimal score for subsequences ending at each index
             pointer_matrix for reconstructing a solution
-
         '''
 
         m = len(left) + 1
@@ -336,9 +335,23 @@ class LocalAligner(Aligner):
 ########################################################################################################################
 
 class AffineLocalAligner(LocalAligner):
+    '''
+    AffineLocalAligner is a class for performing the Smith-Waterman algorithm 
+    with an affine penalty on two documents.
+
+    Attributes:
+        match_score: match score for Smith-Waterman algorithm
+        mismatch_score: mismatch score for Smith-Waterman algorithm
+        gap_start: gap score for initial space
+        gap_extend: gap score for every gap
+        first_gap_in_sequence_of_gaps = gap_score + gap_extend
+        every_subsequent_gap_in_sequence_of_gaps = gap_extend
+    '''
 
     def __init__(self, match_score=3, mismatch_score=-1, gap_start=-3, gap_extend = -.5):
-        
+        '''
+        inits AffineLocalAligner with match_score, mismatch_score, gap_start, and gap_extend
+        '''
         self._algorithm_name = "affine_local_alignment"
         
         super(AffineLocalAligner,self).__init__()
@@ -349,7 +362,16 @@ class AffineLocalAligner(LocalAligner):
         self.gap_extend = gap_extend
 
     def align(self, left_sections, right_sections):
+        '''
+        description:
+            find alignments between two documents according to affine scoring
+        args:
+            left_sections: a list of lists of words
+            right_sections: a list of lists of words (usually just a list of a list of words)
 
+        returns:
+            alignment object
+        '''
         alignments = []
         alignment_indices = []
 
@@ -391,7 +413,19 @@ class AffineLocalAligner(LocalAligner):
 
     @jit
     def _compute_matrix(self, left, right, match_score=3, mismatch_score=-1, gap_start=-2, gap_extend = -.5):
-        
+        '''
+        description:
+            create matrix of optimal scores according to affine scoring system
+        args:
+            left: an array of integers
+            right: an array of integers
+            match_score: score for match in alignment
+            mismatch_score: score for mismatch in alignment
+            gap_start: score for first gap 
+            gap_extend: score for every gap
+        returns:
+            three matrices required to construct optimal solution
+        '''
         m = len(left) + 1
         n = len(right) + 1
         H = np.zeros((m, n), dtype =float) #best match ending at i,j
@@ -436,6 +470,22 @@ class AffineLocalAligner(LocalAligner):
     @jit
     def _backtrace(self, left, right, H, F, E, match_score,
                  mismatch_score, gap_start, gap_extend):
+
+        '''
+        description:
+            backtrace for recovering solution from dp matrix in affine scoring system
+        args:
+            left: an array of integers
+            right: an array of integers
+            H: matrix
+            F: matrix
+            E: matrix
+        returns:
+            left_alignment: array of integers
+            right_alignment: array of integers
+            score: score of alignment
+            align_index: dictionary with indices of where alignment occurs in left and right
+        '''
 
         i,j = np.unravel_index(H.argmax(), H.shape)
 
@@ -496,6 +546,17 @@ class AffineLocalAligner(LocalAligner):
 
 
     def alignment_score(self,l,r):
+        '''
+        description:
+            computes the score of an alignment using the affine scoring
+            used for checking algorithm
+        args:
+            l: list of words
+            r: list of words
+        returns:
+            score: number
+
+        '''
         score = 0
         prev_gap = 0 #was previous symbol gap
         for i in range(len(l)):
@@ -514,81 +575,6 @@ class AffineLocalAligner(LocalAligner):
 
         return score
 
-########################################################################################################################
-########################################################################################################################
-
-
-class Word2VecLocalAligner(LocalAligner):
-
-    def __init__(self,match_score = 3, mismatch_score = -1, gap_score = -2):
-        LocalAligner.__init__(self, match_score, mismatch_score, gap_score)
-        self.model = load_word2vec()
-        self._algorithm_name = 'word2vec_local_alignment'
-
-    def __str__(self):
-        
-        name_str = "{0} instance".format(self._algorithm_name)
-        param_str_1 = "match_score = {0}".format(self.gap_score)
-        param_str_2 = "mismatch_score = {0}".format(self.match_score)
-        param_str_3 = "gap_score = {0}".format(self.mismatch_score)
-        return "{0}: {1}, {2}, {3}".format(name_str,param_str_1,param_str_2,param_str_3)
-
-
-    def align(self,left_sections,right_sections):
-        
-        alignments = []
-        alignment_indices = []
-        
-        for left in left_sections:
-            for right in right_sections:
-
-                a_ints, b_ints, word_map = self._transform_text(left, right)
-
-                score_matrix, pointer_matrix = self._compute_matrix(a_ints, b_ints,self.match_score,
-                        self.mismatch_score, self.gap_score, self.model)
-
-                l, r, score, align_index = self._backtrace(a_ints, b_ints, score_matrix, pointer_matrix)
-
-                reverse_word_map = {v:k for k,v in word_map.items()}
-                reverse_word_map["-"] = "-" 
-                l = [reverse_word_map[w] for w in l]
-                r = [reverse_word_map[w] for w in r]
-                
-                alignment_indices.append(align_index)
-                alignments.append((score, l, r))
-
-        left = reduce(lambda x,y:x+y,left_sections)
-        right = reduce(lambda x,y:x+y,right_sections)
-        
-        return Alignment(left,right,alignments,alignment_indices)
-
-
-    @jit
-    def _compute_matrix(self, left, right, match_score, mismatch_score, gap_score, model):
-
-        m = len(left) + 1
-        n = len(right) + 1
-        score_matrix = np.zeros((m, n),dtype =  float)
-        scores = np.zeros((4),dtype = float)
-        pointer_matrix = np.zeros((m,n),dtype = int)
-        for i in xrange(1, m):
-            for j in xrange(1, n):
-                
-                if left[i-1] == right[j-1]:
-                    scores[1] = score_matrix[i-1,j-1] + match_score
-                else:
-                    scores[1] = score_matrix[i-1,j-1] + mismatch_score*cosine(left[i-1], right[j-1])
-
-                scores[2] = score_matrix[i, j - 1] + gap_score
-                
-                scores[3] = score_matrix[i - 1, j] + gap_score
-        
-                max_decision = np.argmax(scores)
-
-                pointer_matrix[i,j] = max_decision
-                score_matrix[i,j] = scores[max_decision]
-        
-        return score_matrix, pointer_matrix
 
 ########################################################################################################################
 ########################################################################################################################
@@ -645,8 +631,6 @@ def create_doc_test_cases():
        1, 1, 1, 1, 1, 0, 1])], [np.array([2, 0, 3, 1, 2, 4, 0, 1, 3, 0, 1, 4, 1, 3, 1, 4, 0, 0, 1, 2, 4, 0, 0, \
        2, 4, 1, 3, 2, 2, 4])])]
 
-    # print tests
-
     return tests
 
 
@@ -686,11 +670,6 @@ def LocalAligner_unit_tests():
         alignments = seqToAlign(z1,z2) #default score is 3,-1,-2
 
         l_true, r_true = alignments[0][1:]
-
-        # print 'left_alignment: ', l
-        # print 'left_true: ', l_true
-        # print 'right_alignment: ', r
-        # print 'right_true: ', r_true
 
         for i in range(len(l)):
             if l[i] != l_true[i]:
@@ -793,12 +772,7 @@ def generic_doc_speed_test(algorithm):
         average_alg_times.append(np.mean(alg_times))
     
     return average_local_times, average_alg_times
-    # plt.plot(input_sizes,average_local_times, color = 'b', label = 'local alignment')
-    # plt.plot(input_sizes,average_alg_times, color='r', label = g._algorithm_name)
-    # plt.legend(loc='upper right')
-    # plt.xlabel('input size')
-    # plt.ylim(0,0.02)
-    # plt.show()
+
 
 
 def doc_test_alignment_indices(algorithm):
@@ -932,16 +906,7 @@ def section_test_alignment_indices():
     for i in range(len(Alignment.alignments)):
         left, right = clean_alignment(Alignment.alignments[i])
 
-        # print 'left: ', left
-        # print 'left_flattened: ', left_test_flattened
-        # print '\n'
-
-        # print 'right: ', right
-        # print 'right_flattened: ', right_test_flattened
-        # print '\n'
-
         print 'alignment length: ', len(left)
-
 
         left_start, left_end = find_subsequence(left, left_test_flattened)
         right_start, right_end = find_subsequence(right, right_test_flattened)
@@ -1023,7 +988,6 @@ if __name__ == '__main__':
     # section_test_alignment_indices()
 
     # print 'running speed test on Word2VecLocalAligner.... \n'
-    average_local_times, average_alg_times = generic_doc_speed_test(Word2VecLocalAligner)
 
 
 
