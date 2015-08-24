@@ -31,21 +31,22 @@ def create_bill_to_bill_matrix(jsonfile):
 	df.columns = ['interst_group_id','model_legislation_id', 'unique_id','score_max','state','bill_ml_id','undirected']
 
 #code to create network
-	score_mean = df_grouped['score_sum'].tolist()
+	#First group by unique_id of bill so that we get the max alignment for each bill
+	df_grouped = df.groupby(['unique_id']).max()
+	score_mean = df_grouped['score_max'].tolist()
 	index = df_grouped.index
-	ids = index.tolist()
+	ids = df_grouped['bill_ml_id'].tolist()
+	state = df_grouped['state'].tolist()
 	id_list1 = []
-	id_list2 = []
 	for n in ids:
-		id1 = n[:-3]
-		id2 = n[-2:]
+		id_split = n.split('_')
+		id1 = id_split[0]
 		id_list1.append(id1)
-		id_list2.append(id2)
-	final_list = zip(id_list1, id_list2, score_mean)
+	final_list = zip(id_list1, state, score_mean)
 
 	
 	
-	out_file = open("./alec_bill_network.csv",'w')
+	out_file = open("./interest_groups_to_state_network.csv",'w')
 	for item in final_list:
 		out_file.write("{0},{1},{2},{3}\n".format(item[0],item[1],item[2],'undirected'))
 	out_file.close()
@@ -84,32 +85,42 @@ df_dates.columns = ['unique_id', 'date_introduced','date_signed']
 
 #Merge the two data frames and save to csv
 df2 = pd.merge(df, df_dates, on='unique_id')
-#We had multiple rows for each model_legislation to bill comparison, so I eliminate duplicates using the unique 
-#of bill_ml_id
+
+
 df3 = df2.drop_duplicates('bill_ml_id')
 
+#We had multiple rows for each model_legislation to bill comparison, so I eliminate duplicates using the unique 
+#of bill_ml_id
 
-df3_unique = df2.groupby(['unique_id']).max()
+#subset to have only alec
+df_alec = df3[(df3.interst_group_id =='alec_bills')|(df3.interst_group_id=='alec_old')]
+#eliminate duplicates where two alec bills are influencing the same bill, get only the one that has the max score
+df_alec_unique = df_alec.groupby(['unique_id']).max()
+df_alec_unique.to_csv('./alec_model_legislation_to_bills_max_score.csv')
 
-df3_unique.to_csv('./alec_model_legislation_to_bills_max_score.csv')
-
-
-
-
-
-
-
-
-
-
-
+#ALICE
+df_alice = df3[(df3.interst_group_id =='alice_bills')]
+df_alice_unique = df_alice.groupby(['unique_id']).max()
+df_alice_unique.to_csv('./alice_model_legislation_to_bills_max_score.csv')
 
 
+## Need to subset to avoid double counting those states that have the same bill as HB1 and SB1
+#df_dict = df.T.to_dict().values()
 
+#eliminate rows where one model_legislation is influencing two laws in the same year. This eliminates double-counting
+#for each state:
+#for alec
+df = pd.read_csv('all_alec_model_legislation_to_bills_max_score.csv')
+df['date_introduced'] = pd.to_datetime(df.date_introduced)
+date = df['date_introduced']
+df['year_introduced']=date.apply(lambda x:x.year)
+df_grouped = df.groupby(['state', 'year_introduced', 'model_legislation_id']).max()
+df_grouped.to_csv('./all_alec_model_legislation_to_bills_max_score.csv')
 
-
-
-
-
-
-
+#for alice
+df = pd.read_csv('alice_model_legislation_to_bills_max_score.csv')
+df['date_introduced'] = pd.to_datetime(df.date_introduced)
+date = df['date_introduced']
+df['year_introduced']=date.apply(lambda x:x.year)
+df_grouped = df.groupby(['state', 'year_introduced', 'model_legislation_id']).max()
+df_grouped.to_csv('./alice_model_legislation_to_bills_max_score.csv')

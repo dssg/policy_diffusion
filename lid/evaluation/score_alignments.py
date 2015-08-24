@@ -20,10 +20,9 @@ def weight_tfidf(alignment, state_tfidf, left_state, right_state):
 	f = StateTFIDF(state_tfidf)
 	return np.sum([f.tfidf_score(a, left_state, right_state)*a[0] for a in alignment.alignments])
 
-def jaccard_coefficient(list_of_alignments):
-    jaccard_scores = [jaccard_similarity_score(alignment[1],alignment[2]) for alignment in list_of_alignments]
-    
-    return np.mean(jaccard_scores)
+def jaccard_coefficient(left, right):
+    jaccard_scores = jaccard_similarity_score(left,right)
+    return jaccard_scores
 
 def load_word2vec():
     model = Word2Vec.load_word2vec_format('/mnt/data/sunlight/GoogleNews-vectors-negative300.bin', binary=True)
