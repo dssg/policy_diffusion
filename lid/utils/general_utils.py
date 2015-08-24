@@ -6,7 +6,152 @@ from ftplib import FTP, error_perm
 import re
 from StringIO import StringIO
 import time
-import multiprocessing
+import multiprocessing as mp
+import gc
+import signal
+import csv
+import codecs
+import cStringIO
+
+#######Code from http://www.filosophy.org/post/32/python_function_execution_deadlines__in_simple_examples/ #########
+
+class TimedOutExc(Exception):
+    pass
+
+def deadline(timeout, *args):
+
+    def decorate(f):
+        def handler(signum, frame):
+            raise TimedOutExc()
+        
+        def new_f(*args):
+
+            signal.signal(signal.SIGALRM, handler)
+            signal.alarm(timeout)
+            return f(*args)
+            signa.alarm(0)
+
+        new_f.__name__ = f.__name__
+        return new_f
+    return decorate
+
+#######Code from http://www.filosophy.org/post/32/python_function_execution_deadlines__in_simple_examples/ #########
+
+class UnicodeWriter():
+    def __init__(self, f, dialect=csv.excel, encoding="utf-8-sig", **kwds):
+        self.queue = cStringIO.StringIO()
+        self.writer = csv.writer(self.queue, dialect=dialect, **kwds)
+        self.stream = f
+        self.encoder = codecs.getincrementalencoder(encoding)()
+    def writerow(self, row):
+        '''writerow(unicode) -> None
+        This function takes a Unicode string and encodes it to the output.
+        '''
+        self.writer.writerow([s.encode("utf-8") for s in row])
+        data = self.queue.getvalue()
+        data = data.decode("utf-8")
+        data = self.encoder.encode(data)
+        self.stream.write(data)
+        self.queue.truncate(0)
+
+    def writerows(self, rows):
+        for row in rows:
+            self.writerow(row)
+
+
+class WorkerPool():
+
+    def __init__(self,num_workers=1,worker_timeout = 600):
+        
+        self._num_workers = num_workers
+        self._worker_timeout = worker_timeout
+        self._results = mp.Queue()
+        self._pool = [None]*self._num_workers
+        self._worker_times = [0.0]*self._num_workers
+
+    def _assign_new_task(self,worker_id,input_args):
+        p = self._pool[worker_id]
+        p.join()
+        arg = input_args.pop()
+        new_p = mp.Process(target= func,args = (arg,self._results),name = ('process_'+str(worker_id)))
+        new_p.start()
+        self._pool[worker_id] = new_p
+        self._worker_times[worker_id] = time.time()
+        
+    def work(self,func,input_args):
+        worker_counter = 0
+        #define wrapper function that queues result from input func
+        def new_func(x):
+            y = func(*x)
+            self._results.put(y)
+
+        #initialize all workers
+        #for i in range(self._num_workers):
+        #    arg = input_args.pop(0)
+        #    p = mp.Process(target= new_func,args = (arg,),name = ('process_'+str(arg)))
+        #    p.start()
+        #    self._pool[i] = p
+        #    self._worker_times[i] = time.time()
+        
+        #print input_args
+        
+        while len(input_args) > 0 or ("running" in status):
+            
+            #assign new worker tasks to empty pool slots
+            for i in range(self._num_workers):
+                    
+                if len(input_args) > 0 and self._pool[i] is None:
+                    arg = input_args.pop(0)
+                    new_p = mp.Process(target= new_func,args = (arg,),name = ('process_'+str(i)))
+                    new_p.start()
+                    print worker_counter
+                    worker_counter+=1
+                    self._pool[i] = new_p
+                    self._worker_times[i] = time.time()
+
+            time.sleep(0.1)
+            status = self.check_pool_status(time.time())
+            import numpy as np
+            print time.time() - np.array(self._worker_times)
+            for i in range(len(status)):
+                if status[i] == "completed":
+                    p = self._pool[i]
+                    p.terminate()
+                    p.join()
+                    self._pool[i] = None
+                    del p
+                elif status[i] == "timeout":
+                    p = self._pool[i]
+                    p.terminate()
+                    self._pool[i] = None
+                    print "terminated job  ",p.name
+                    gc.collect()
+        
+        result_list = []
+
+        while not self._results.empty():
+            result_list.append( self._results.get() )
+
+        return result_list
+
+    #returns a list of bools indicating running status of each worker. 
+    #running,timeout,completed
+    def check_pool_status(self,current_time):
+        status_list = []
+        for i in range(self._num_workers):
+
+            worker = self._pool[i]
+            if worker is None:
+                status_list.append("closed")
+            elif worker.is_alive() and (current_time-self._worker_times[i]<self._worker_timeout):
+                status_list.append("running")
+            elif worker.is_alive() and (current_time-self._worker_times[i]>=self._worker_timeout):
+                status_list.append("timeout")
+            elif not worker.is_alive():
+                status_list.append("completed")
+
+        return status_list
+
 
 
 def alignment_tokenizer(s,type = "space"):

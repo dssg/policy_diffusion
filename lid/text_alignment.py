@@ -13,7 +13,6 @@ import sys
 import abc
 import json
 import pickle
-from tika import parser
 import urllib2
 import re
 import pandas as pd

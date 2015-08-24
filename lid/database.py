@@ -10,7 +10,6 @@ import utils
 from multiprocessing import Pool
 import re
 import itertools
-from tika import parser as tp
 import numpy as np
 import logging
 import elasticsearch

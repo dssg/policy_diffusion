@@ -16,7 +16,7 @@ import re
 import nltk
 from utils.text_cleaning import clean_document
 from lid import LID
-from utils.utils import alignment_tokenizer
+from utils.general_utils import alignment_tokenizer
 from text_alignment import LocalAligner
 
 env = Environment(loader=FileSystemLoader("{0}/html/templates".format(os.environ['POLICY_DIFFUSION'])))
@@ -146,7 +146,7 @@ class DemoWebserver(object):
 
     
     @cherrypy.expose
-    def searchdemo(self, evaluation_data = None,left_doc_id = None,right_doc_id = None ):
+    def searchdemo(self,  query_string = "proof of identity",query_results = []):
         
         query_string =  re.sub('\"',' ',query_string)
                 
