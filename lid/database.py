@@ -15,7 +15,6 @@ import logging
 import elasticsearch
 
 
-
 #Constants
 STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legistlation"
@@ -27,7 +26,6 @@ class ElasticConnection():
 
     def __init__(self,host = "localhost",port = 9200):
         self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 200)
-
 
     # creates index for bills and model legislation stored in
     # data_path, overwriting index if it is already created
@@ -137,7 +135,6 @@ class ElasticConnection():
                 del bulk_data
                 bulk_data = []
 
-
     def create_evaluation_index(self, data_path):
         if self.es_connection.indices.exists(EVALUATION_INDEX):
             print("deleting '%s' index..." % (EVALUATION_INDEX))
@@ -182,7 +179,6 @@ class ElasticConnection():
         doc_ids = [res['_id'] for res in results['hits']['hits']]
         
         return doc_ids
-        
 
     def query_state_bills_for_frontend(self,query):
         
