@@ -28,7 +28,7 @@ class LID(object):
 
     
     def __init__(self,aligner = LocalAligner(),elastic_host = "localhost",elastic_port=9200,
-            query_results_limit=100,lucene_score_threshold = 0.5):
+            query_results_limit=300,lucene_score_threshold = 0.01):
         '''
         alignment_object: any object that inherets from abstract class Alignment
 
@@ -97,8 +97,9 @@ class LID(object):
         for i,result_doc in enumerate(result_docs):
             #print i,result_doc['score'],result_doc['state']
             
-            if result_doc['state'] == kwargs['state_id']:
-                continue
+            if "state_id" in kwargs:
+                if result_doc['state'] == kwargs['state_id']:
+                    continue
 
             if result_doc['score'] < self.lucene_score_threshold:
                 break

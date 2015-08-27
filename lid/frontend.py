@@ -17,12 +17,18 @@ import nltk
 from utils.text_cleaning import clean_document
 from lid import LID
 from utils.general_utils import alignment_tokenizer
-from text_alignment import LocalAligner
+from text_alignment import LocalAligner,AffineLocalAligner
 
 env = Environment(loader=FileSystemLoader("{0}/html/templates".format(os.environ['POLICY_DIFFUSION'])))
 
 query_samples = [x.strip() for x in open("{0}/data/state_bill_samples.txt".format(os.environ['POLICY_DIFFUSION']))]
 
+aligner = AffineLocalAligner(match_score=4, mismatch_score=-1, gap_start=-3, gap_extend = -1.5)
+#aligner = LocalAligner()
+    
+ec = ElasticConnection(host = "54.203.12.145")
+
+lidy = LID(query_results_limit=20,elastic_host = "54.203.12.145",lucene_score_threshold = 0.01,aligner = aligner)
 
 def get_alignment_highlight(text1,text2):
     aligns = align(text1, text2)
@@ -42,7 +48,75 @@ def get_alignment_highlight(text1,text2):
 
     return text1,text2
 
+
+
+def markup_alignment_for_display(alignment_dict,left_text,right_text):
+
+    left_text = left_text.split()
+    right_text = right_text.split()
+    l = alignment_dict['left']
+    r = alignment_dict['right']
+    left_start = alignment_dict['left_start']
+    left_end = alignment_dict['left_end']
+    right_start = alignment_dict['right_start']
+    right_end = alignment_dict['right_end']
+
+
+    print left_text
+    print right_text
+
+    #mark up l and r alignments with style
+    l_styled = []
+    r_styled = []
+    temp_text = ""
+    for i in range(len(l)):
+        if l[i] == r[i] and l[i] != "-":
+            temp_text+=l[i]
+            temp_text+=" "
+        if l[i] != r[i]:
+            if len(temp_text)>0:
+                temp_text = u"<mark>{0}</mark>".format(temp_text) 
+                l_styled.append(temp_text)
+                r_styled.append(temp_text)
+                temp_text = ""
+            if l[i] != "-" and r[i] != "-":
+                l_styled.append(u"{0}".format(l[i]))
+                r_styled.append(u"{0}".format(r[i]))
+            else:
+                l_styled.append(l[i])
+                r_styled.append(r[i])
     
+    temp_text = u"<mark>{0}</mark>".format(temp_text) 
+    l_styled.append(temp_text)
+    r_styled.append(temp_text)
+
+    #l[i] = "<mark>{0}</mark>".format(l[i])
+    #r[i] = "<mark>{0}</mark>".format(r[i])
+
+        
+    #l.insert(0,"<mark>")
+    #l.append("</mark>")
+    #r.insert(0,"<mark>")
+    #r.append("</mark>")
+
+    
+
+
+    padding = [u"<br><br>"]
+
+    left_text = left_text[:left_start]+padding+l_styled+\
+            padding+left_text[left_end:]
+
+    right_text = right_text[:right_start]+padding+r_styled+padding\
+            +right_text[right_end:]
+    
+    left_text = u" ".join(left_text)
+    right_text = u" ".join(right_text)  
+    
+    return left_text,right_text
+
+
+
 
 def markup_alignment_difference(l,r):
     l_styled = []
@@ -73,6 +147,8 @@ class DemoWebserver(object):
         self.lidy = LID(elastic_host = "54.203.12.145",query_results_limit=100)
         self.aligner = LocalAligner()
         self.query_bill = "bill"
+
+    
 
 
     @cherrypy.expose
@@ -149,78 +225,39 @@ class DemoWebserver(object):
     def searchdemo(self,  query_string = "proof of identity",query_results = []):
         
         query_string =  re.sub('\"',' ',query_string)
-                
-        query_string = clean_text_for_query(query_string,state = None)
-        query_results = self.ec.query_state_bills_for_frontend(query_string)
-        query_results = [[r['text'],r['score'],r['id'],r['state']] for r in query_results]
+        
+        query_result = lidy.find_state_bill_alignments(query_string,document_type = "text",
+            split_sections = False, query_document_id = "front_end_query" )
+
+        #result_doc_ids = [x['document_id'] for x in query_result['alignment_results']]
+        #result_doc_ids = [x.split("_") for x in result_doc_ids]
+        #result_doc_ids = [[x[0].upper(),x[1].upper(),x[2]] for x in result_doc_ids]
+
+        results_to_show = []
+        for result_doc in query_result['alignment_results']:
+            
+            meta_data = result_doc['document_id'].split("_")
+            meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
+            
+            result_text = ec.get_bill_by_id(result_doc['document_id'])['bill_document_last']
+            result_text = re.sub('\"',' ',result_text)
+            
+            alignment = result_doc['alignments'][0]
+            score = alignment['score']
+
+            left,right = markup_alignment_for_display(alignment,
+                    query_string,result_text)
+            left = re.sub('\"',' ',left)
+            right = re.sub('\"',' ',right)
+            results_to_show.append([score]+meta_data + [left,right])
         
         
-        alignment_results = []
-        for q in query_results:
-            text = q[0]
-            text = re.sub('\"',' ',text)
-            text = clean_text_for_query(text,state = None)
-            query_list = query_string.split()
-            text = text.split()
-            f = LocalAligner()
-            alignments=f.align(query_list,text) #default score is 3,-1,-2
-            score, l, r  = alignments.alignments[0]
-            
-            #mark up l and r alignments with style
-            l_styled = []
-            r_styled = []
-            temp_text = ""
-            for i in range(len(l)):
-                if l[i] == r[i] and l[i] != "-":
-                    temp_text+=l[i]
-                    temp_text+=" "
-                if l[i] != r[i]:
-                    if len(temp_text)>0:
-                        temp_text = "<mark>{0}</mark>".format(temp_text) 
-                        l_styled.append(temp_text)
-                        r_styled.append(temp_text)
-                        temp_text = ""
-                    if l[i] != "-" and r[i] != "-":
-                        l_styled.append(u"<b>{0}</b>".format(l[i]))
-                        r_styled.append(u"<b>{0}</b>".format(r[i]))
-                    else:
-                        l_styled.append(l[i])
-                        r_styled.append(r[i])
-            
-            temp_text = "<mark>{0}</mark>".format(temp_text) 
-            l_styled.append(temp_text)
-            r_styled.append(temp_text)
-
-                    #l[i] = "<mark>{0}</mark>".format(l[i])
-                    #r[i] = "<mark>{0}</mark>".format(r[i])
-
-                
-            #l.insert(0,"<mark>")
-            #l.append("</mark>")
-            #r.insert(0,"<mark>")
-            #r.append("</mark>")
-
-            
-
-
-            padding = ["<br><br>------------------------------MATCH-------------------------------<br><br>"]
-
-            left_text = query_list[:f.alignment_indices[0]['left_start']]+padding+l_styled+\
-                    padding+query_list[f.alignment_indices[0]['left_end']:]
-
-            right_text = text[:f.alignment_indices[0]['right_start']]+padding+r_styled+padding\
-                    +text[f.alignment_indices[0]['right_end']:]
-            
-            left_text = " ".join(left_text)
-            right_text = " ".join(right_text)    
-            
-            alignment_results.append( [ left_text,right_text,"{0:.2f}".format(q[1]),q[2]])
-            
-            
+        results_to_show.sort(key = lambda x:x[0],reverse = True)
+        print [len(x) for x in results_to_show]
         tmpl = env.get_template('searchdemo.html')
         c = {
                 'query_string': query_string,
-                'query_results': alignment_results,
+                'results_to_show': results_to_show,
         }
         return tmpl.render(**c)
     
@@ -263,6 +300,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     es_host,es_port = args.elasticsearch_connection.split(":") 
-    ec = ElasticConnection(es_host,es_port)
     cherrypy.config.update({'server.socket_port': args.port, 'server.socket_host': args.host})
     cherrypy.quickstart(DemoWebserver(ec))

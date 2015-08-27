@@ -52,6 +52,12 @@ def word2vec_similarity(list_of_alignments, model):
     return np.mean(distances)
 
         
+
+
+
+
+
+
 ####################################################################
 ##tfidf functions
 
