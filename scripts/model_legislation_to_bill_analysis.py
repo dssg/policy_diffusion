@@ -7,7 +7,12 @@ import numpy as np
 alec_json = "/Users/eugeniagiraudy/Dropbox/DSSG/policy_diffusion/scripts/model_legislation_alignments.json"
 
 def create_bill_to_bill_matrix(jsonfile):
-	alignments = [json.loads(x.strip()) for x in open(alec_json)]
+	'''
+	Converts a json file with matching text between model legislation and bills into a 
+	dataframe.
+
+	'''
+	alignments = [json.loads(x.strip()) for x in open(jsonfile)]
 	df_list = []
 	for i in range(len(alignments)):
 		left_id = alignments[i]['query_document_id']
@@ -26,101 +31,54 @@ def create_bill_to_bill_matrix(jsonfile):
 		except KeyError:
 				print left_id, 'failed'
 				continue
-
 	df = pd.DataFrame(df_list)
 	df.columns = ['interst_group_id','model_legislation_id', 'unique_id','score_max','state','bill_ml_id','undirected']
+	return df
 
-#code to create network
-	#First group by unique_id of bill so that we get the max alignment for each bill
-	df_grouped = df.groupby(['unique_id']).max()
-	score_mean = df_grouped['score_max'].tolist()
-	index = df_grouped.index
-	ids = df_grouped['bill_ml_id'].tolist()
-	state = df_grouped['state'].tolist()
-	id_list1 = []
-	for n in ids:
-		id_split = n.split('_')
-		id1 = id_split[0]
-		id_list1.append(id1)
-	final_list = zip(id_list1, state, score_mean)
 
+def grab_ids_for_data_frame(df):
+	'''
+	Grabs bill ids from ElasticSearch and adds it to a dataframe. 
+	Outputs csv file with data frame containing model legislation to bills matches and 
+	information on date introduced and date signed
+
+	Arguments: 
+		dataframe = data frame containing model legislation to bill analysis
+
+	'''
+	bill_id_list = df['unique_id']
+	bill_id_list = bill_id_list.tolist()
+
+	ec = ElasticConnection(host = '54.203.12.145', port = 9200)
+
+	bill_dates = []
+	bill_signed = []
+	for bill in bill_id_list:
+	    bill_all = ec.get_bill_by_id(bill)
+	    date_introduced = bill_all['date_introduced']
+	    date_signed = bill_all['date_signed']
+	    bill_dates.append(date_introduced)
+	    bill_signed.append(date_signed)
+	    print bill
+	bills_introd_signed = zip(bill_id_list, bill_dates, bill_signed)
+	df_dates = pd.DataFrame(bills_introd_signed)
+	df_dates.columns = ['unique_id', 'date_introduced', 'date_signed']
+	df2 = pd.merge(df, df_dates, on='unique_id')
+	#Drop duplicates from the merge
+	df3 = df2.drop_duplicates('bill_ml_id')	
+	return df3.to_csv('./model_legislation_to_bills_max_score.csv')
 	
 	
-	out_file = open("./interest_groups_to_state_network.csv",'w')
-	for item in final_list:
-		out_file.write("{0},{1},{2},{3}\n".format(item[0],item[1],item[2],'undirected'))
-	out_file.close()
-
-create_bill_to_bill_matrix(alec_json)
-
-#######
-
-#Get bill_ids to get data on whether the bill passed or not
-bill_id_list = df['unique_id']
-bill_id_list = bill_id_list.tolist()
 
 
-#Get info about bills (e.g. dates) using unique_ids and getting information from elasticsearch
-ec = ElasticConnection(host = '54.203.12.145', port = 9200)
+#Analysis of ALEC
 
-bill_dates = []
-bill_signed = []
-for bill in bill_id_list:
-    bill_all = ec.get_bill_by_id(bill)
-    date_introduced = bill_all['date_introduced']
-    date_signed = bill_all['date_signed']
-    bill_dates.append(date_introduced)
-    bill_signed.append(date_signed)
-    print bill
-bills_introd_signed = zip(bill_id_list, bill_dates, bill_signed)
-out_file = open("./alec_dates.csv", 'w')
-for item in bills_introd_signed:
-	out_file.write("{0},{1},{2}\n".format(item[0],item[1],item[2]))
-out_file.close()
-
-
-#Make list of dates a df to merge later on
-df_dates = pd.DataFrame(bills_introd_signed)
-df_dates.columns = ['unique_id', 'date_introduced','date_signed']
-
-#Merge the two data frames and save to csv
-df2 = pd.merge(df, df_dates, on='unique_id')
-
-
-df3 = df2.drop_duplicates('bill_ml_id')
-
-#We had multiple rows for each model_legislation to bill comparison, so I eliminate duplicates using the unique 
-#of bill_ml_id
-
-#subset to have only alec
 df_alec = df3[(df3.interst_group_id =='alec_bills')|(df3.interst_group_id=='alec_old')]
-#eliminate duplicates where two alec bills are influencing the same bill, get only the one that has the max score
-df_alec_unique = df_alec.groupby(['unique_id']).max()
-df_alec_unique.to_csv('./alec_model_legislation_to_bills_max_score.csv')
+#eliminate cases where two model legislations influence the same bill
+df_alec = df_alec.groupby(['unique_id']).max()
+date = df_alec['date_introduced']
+df_alec['year_introduced']=date.apply(lambda x:x.year)
+#eliminate cases wher states may have two identical bills for a given year
+df_grouped = df_alec.groupby(['state', 'year_introduced', 'model_legislation_id']).max()
+df_grouped.to_csv('./alec_model_legislation_to_bills_max_score_unique.csv')
 
-#ALICE
-df_alice = df3[(df3.interst_group_id =='alice_bills')]
-df_alice_unique = df_alice.groupby(['unique_id']).max()
-df_alice_unique.to_csv('./alice_model_legislation_to_bills_max_score.csv')
-
-
-## Need to subset to avoid double counting those states that have the same bill as HB1 and SB1
-#df_dict = df.T.to_dict().values()
-
-#eliminate rows where one model_legislation is influencing two laws in the same year. This eliminates double-counting
-#for each state:
-#for alec
-df = pd.read_csv('all_alec_model_legislation_to_bills_max_score.csv')
-df['date_introduced'] = pd.to_datetime(df.date_introduced)
-date = df['date_introduced']
-df['year_introduced']=date.apply(lambda x:x.year)
-df_grouped = df.groupby(['state', 'year_introduced', 'model_legislation_id']).max()
-df_grouped.to_csv('./all_alec_model_legislation_to_bills_max_score.csv')
-
-#for alice
-df = pd.read_csv('alice_model_legislation_to_bills_max_score.csv')
-df['date_introduced'] = pd.to_datetime(df.date_introduced)
-date = df['date_introduced']
-df['year_introduced']=date.apply(lambda x:x.year)
-df_grouped = df.groupby(['state', 'year_introduced', 'model_legislation_id']).max()
-df_grouped.to_csv('./alice_model_legislation_to_bills_max_score.csv')
