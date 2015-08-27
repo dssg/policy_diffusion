@@ -15,18 +15,17 @@ import logging
 import elasticsearch
 
 
-
 #Constants
 STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legistlation"
 EVALUATION_INDEX = "evaluation_texts"
+EVALUATION_INDEX_ALL_BILLS = "evaluation_bills_all_bills"
 
 
 class ElasticConnection():
 
     def __init__(self,host = "localhost",port = 9200):
         self.es_connection = Elasticsearch([{'host': host, 'port': port}],timeout = 200)
-
 
     # creates index for bills and model legislation stored in
     # data_path, overwriting index if it is already created
@@ -70,6 +69,71 @@ class ElasticConnection():
                 del bulk_data
                 bulk_data = []
 
+    def create_evaluation_index_all_bills(self, data_path1, data_path2):
+        '''
+        data_path1 corresponds to evaluation data
+        data_path2 corresponds to rest of bill data
+        '''
+        if self.es_connection.indices.exists(EVALUATION_INDEX_ALL_BILLS):
+            print("deleting '%s' index..." % (EVALUATION_INDEX_ALL_BILLS))
+            self.es_connection.indices.delete(index=EVALUATION_INDEX_ALL_BILLS)
+
+        #use same mapping as in state index 
+        mapping_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/evaluation_mapping.json").read())
+        settings_doc = json.loads(open(os.environ['POLICY_DIFFUSION'] + "/db/state_bill_index.json").read())
+
+        print("creating '%s' index..." % (EVALUATION_INDEX_ALL_BILLS))
+        res = self.es_connection.indices.create(index=EVALUATION_INDEX_ALL_BILLS, body=settings_doc,timeout=30)
+
+        print("adding mapping for bill_documents")
+        res = self.es_connection.indices.put_mapping(index=EVALUATION_INDEX_ALL_BILLS, doc_type="bill_document",
+                                                body=mapping_doc)
+    
+        #load in evaluation data first
+        bulk_data = []
+        for i, line in enumerate(open(data_path1)):
+            json_obj = json.loads(line.strip())
+            if json_obj is None:
+                continue
+
+            op_dict = {
+                "index": {
+                    "_index": EVALUATION_INDEX_ALL_BILLS,
+                    "_type": "bill_document",
+                    "_id": i
+                }
+            }
+
+            bulk_data.append(op_dict)
+            bulk_data.append(json_obj)
+        
+        print i
+        self.es_connection.bulk(index=EVALUATION_INDEX_ALL_BILLS, body=bulk_data, timeout=300)
+
+        #load in rest of state bill data
+        bulk_data = []
+        for i, line in enumerate(open(data_path2)):
+            json_obj = json.loads(line.strip())
+            if json_obj is None:
+                continue
+
+
+            op_dict = {
+                "index": {
+                    "_index": EVALUATION_INDEX_ALL_BILLS,
+                    "_type": "bill_document",
+                    "_id": json_obj["unique_id"]
+                }
+            }
+
+            bulk_data.append(op_dict)
+            bulk_data.append(json_obj)
+            if len(bulk_data) == 1000:
+                print i
+                self.es_connection.bulk(index=EVALUATION_INDEX_ALL_BILLS, body=bulk_data, timeout=300)
+
+                del bulk_data
+                bulk_data = []
 
     def create_evaluation_index(self, data_path):
         if self.es_connection.indices.exists(EVALUATION_INDEX):
@@ -87,11 +151,6 @@ class ElasticConnection():
         res = self.es_connection.indices.put_mapping(index=EVALUATION_INDEX, doc_type="bill_document",
                                                 body=mapping_doc)
 
-        bulk_data = []
-        for i, line in enumerate(open(data_path)):
-            json_obj = json.loads(line.strip())
-            if json_obj is None:
-                continue
     
         bulk_data = []
         for i, line in enumerate(open(data_path)):
@@ -120,7 +179,6 @@ class ElasticConnection():
         doc_ids = [res['_id'] for res in results['hits']['hits']]
         
         return doc_ids
-        
 
     def query_state_bills_for_frontend(self,query):
         
@@ -201,6 +259,96 @@ class ElasticConnection():
         
         return result_docs
 
+    def similar_doc_query_for_testing_lucene(self,query, match_group, state_id = None,num_results = 100,return_fields = ["state"], 
+                            index = STATE_BILL_INDEX):
+        '''
+        description:
+            only for testing lucene scores
+
+        match_group represents the group of bills that an evaluation bill 
+        belongs to (e.g., all the stand your ground bills)
+        '''
+
+        # json_query = """ 
+        #         {
+        #           "query": {
+        #             "filtered": {
+        #               "query": {
+        #                 "more_like_this": {
+        #                   "fields": [
+        #                     "bill_document_last.shingles"
+        #                   ],
+        #                   "like_text": "",
+        #                   "max_query_terms": 70,
+        #                   "min_term_freq": 1,
+        #                   "min_doc_freq": 2,
+        #                   "minimum_should_match": 1
+        #                 }
+        #               },
+        #               "filter": {
+        #                 "term": {
+        #                   "bill_document.match": ""
+        #                 }
+        #               }
+        #             }
+        #           }
+        #         }
+        # """
+
+        json_query = """ 
+            {
+              "query": {
+                "filtered": {
+                  "query": {
+                    "more_like_this": {
+                      "fields": [
+                        "bill_document_last.shingles"
+                      ],
+                      "like_text": "",
+                      "max_query_terms": 70,
+                      "min_term_freq": 1,
+                      "min_doc_freq": 2,
+                      "minimum_should_match": 1
+                    }
+                  },
+                  "filter": {
+                    "bool": {
+                      "must_not": {
+                        "term": {
+                          "bill_document.state": ""
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """
+        json_query = json.loads(json_query)
+        json_query['query']['filtered']['query']['more_like_this']['like_text'] = query
+        # json_query['query']['filtered']['filter']['term']['bill_document.match'] = match_group
+        json_query['query']['filtered']['filter']['bool']['must_not']['term']['bill_document.state'] = str(state_id)
+
+
+        results = self.es_connection.search(index = index,body = json_query,
+                fields = return_fields,
+                size = num_results )
+        results = results['hits']['hits']
+        result_docs = []
+        for res in results:
+            doc = {}
+            for f in res['fields']:
+                doc[f] = res['fields'][f][0]
+            #doc['state'] = res["fields"]['state'][0]
+            doc['score'] = res['_score']
+            doc['id'] = res['_id']
+            
+            #if applicable, only return docs that are from different states
+            if doc['state'] != state_id:
+                result_docs.append(doc)
+        
+        return result_docs
+
 
     def get_bill_by_id(self,id, index = 'state_bills'):
         match = self.es_connection.get_source(index = index,id = id)
@@ -221,6 +369,7 @@ class ElasticConnection():
         start = 0
         bad_count = 0
         while start <= total:
+            print start
             body = body_gen(start,step)
             bills = es.search(index="state_bills", body=body)
             bill_list = bills['hits']['hits']
@@ -356,10 +505,15 @@ def main():
     else:
         print args
 
+def create_evaluation_index():
+    state_bill_path = '/mnt/elasticsearch/dssg/extracted_data/extracted_bills.json'
+    evaluation_bill_path = '/mnt/data/sunlight/dssg/extracted_data/extracted_evaluation_texts.json'
+    es = ElasticConnection()
+    es.create_evaluation_index_all_bills(evaluation_bill_path, state_bill_path)
 
 if __name__ == "__main__":
-    main()
-
+    # main()
+    create_evaluation_index()
 
 # b = []
 # for key, value in bills.items():

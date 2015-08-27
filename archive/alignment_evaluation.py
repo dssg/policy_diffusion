@@ -22,7 +22,6 @@ import re
 import csv
 from sklearn.metrics import roc_curve, auc
 import seaborn as sns
-#from score_alignments import *
 import random
 from heapq import *
 from sklearn.metrics import jaccard_similarity_score

@@ -6,6 +6,8 @@ from ftplib import FTP, error_perm
 import re
 from StringIO import StringIO
 import time
+import multiprocessing
+import pickle
 import multiprocessing as mp
 import gc
 import signal
@@ -264,3 +266,15 @@ def find_subsequence(s,q):
         if T:
             return (i, i + j + 1)
     return (0,0)
+
+
+def load_pickle(name):
+    with open('{0}.p'.format(name),'rb') as fp:
+        f =pickle.load(fp)
+
+    return f
+
+
+def save_pickle(thing, name):
+    with open('{0}.p'.format(name),'wb') as fp:
+        pickle.dump(thing, fp)

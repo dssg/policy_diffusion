@@ -41,9 +41,11 @@ def create_bills(ls):
     #get more evaluation bills
     eval_bills = grab_more_eval_bills()
     for more_bills in eval_bills:
+        print 'bill_group: ' k
         k +=1
         for text, state in more_bills:
             bill_id += 1
+            print 'bill_id: ', i
 
             bills[bill_id] = {}
             bills[bill_id]['text'] = text
@@ -94,7 +96,6 @@ def grab_more_eval_bills():
     bills_text = []
     state_list = []
     for i in range(len(bills_ids)):
-    	print 'bill_number: ', i
         try:
             bill_text = get_bill_by_id(bills_ids[i][0])
         except IndexError:
