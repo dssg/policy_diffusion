@@ -13,6 +13,7 @@ import random
 import codecs
 from utils.general_utils import alignment_tokenizer
 from utils.general_utils import UnicodeWriter
+from sklearn.metrics import jaccard_similarity_score
 
 
 def construct_training_set(alignments_file,out_file_name):

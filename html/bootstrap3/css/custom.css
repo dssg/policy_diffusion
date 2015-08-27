@@ -13,5 +13,11 @@ mark {
     overflow: scroll;
 }
 td { 
-    padding: 7px;
+    padding: 5px;
+}
+
+tr:hover { background: #efedf5; }
+td a {
+    display: block; 
+    padding: 16px; 
 }
