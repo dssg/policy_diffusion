@@ -1,7 +1,0 @@
-{
-    "query": {
-        "match": {
-            "bill_document_last.shingles": "enter_query_here"
-        }
-    }  
-}

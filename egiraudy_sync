@@ -1,1 +1,0 @@
-rsync -avz --exclude=".*" -e "ssh -i /Users/eugeniagiraudy/egiraudy.pem" $POLICY_DIFUSSION egiraudy@54.212.36.132:/home/egiraudy/

@@ -94,7 +94,7 @@ class UnicodeWriter():
         for row in rows:
             self.writerow(row)
 
-
+#********DEPRECATED*************
 class WorkerPool():
 
     def __init__(self,num_workers=1,worker_timeout = 600):
@@ -121,15 +121,6 @@ class WorkerPool():
             y = func(*x)
             self._results.put(y)
 
-        #initialize all workers
-        #for i in range(self._num_workers):
-        #    arg = input_args.pop(0)
-        #    p = mp.Process(target= new_func,args = (arg,),name = ('process_'+str(arg)))
-        #    p.start()
-        #    self._pool[i] = p
-        #    self._worker_times[i] = time.time()
-        
-        #print input_args
         
         while len(input_args) > 0 or ("running" in status):
             
@@ -187,7 +178,7 @@ class WorkerPool():
                 status_list.append("completed")
 
         return status_list
-
+# ********DEPRECATED*************
 
 
 def alignment_tokenizer(s,type = "space"):

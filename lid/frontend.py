@@ -19,16 +19,7 @@ from lid import LID
 from utils.general_utils import alignment_tokenizer
 from text_alignment import LocalAligner,AffineLocalAligner
 
-env = Environment(loader=FileSystemLoader("{0}/html/templates".format(os.environ['POLICY_DIFFUSION'])))
 
-query_samples = [x.strip() for x in open("{0}/data/state_bill_samples.txt".format(os.environ['POLICY_DIFFUSION']))]
-
-aligner = AffineLocalAligner(match_score=4, mismatch_score=-1, gap_start=-3, gap_extend = -1.5)
-#aligner = LocalAligner()
-    
-ec = ElasticConnection(host = "54.203.12.145")
-
-lidy = LID(query_results_limit=20,elastic_host = "54.203.12.145",lucene_score_threshold = 0.01,aligner = aligner)
 
 def get_alignment_highlight(text1,text2):
     aligns = align(text1, text2)
@@ -136,7 +127,7 @@ class DemoWebserver(object):
     _cp_config = {
        'tools.staticdir.on' : True,
        'tools.staticdir.dir' : "{0}/html".format(os.environ['POLICY_DIFFUSION']),
-       'tools.staticdir.index' : 'index.html',
+       'tools.staticdir.index' : '/templates/searchdemo.html',
        'tools.sessions.on': True,
     }
     
@@ -148,79 +139,6 @@ class DemoWebserver(object):
         self.aligner = LocalAligner()
         self.query_bill = "bill"
 
-    
-
-
-    @cherrypy.expose
-    def evaluation(self,query_bill = "ga_2011_12_HB1101",alignment_index = 0):
-
-        query_string = self.ec.get_bill_by_id(query_bill)['bill_document_last']
-        if query_string is None:
-            tmpl = env.get_template('evaluation.html')
-            c = {
-                    'query_bill':query_bill,
-                    'display_results': [],
-                    'query_samples': query_samples,
-                    'search_results': [],
-                    'indices':range(100),
-                    'alignment_index':alignment_index,
-                    'align_bill':query_bill,
-                    'query_display':query_bill,
-                    'align_display':alignment_index
-            }
-            return tmpl.render(**c)
-
-        
-        
-        query_sections = clean_document(query_string,doc_type = "state_bill",split_to_section = True,
-                state_id = query_bill.split("_")[0])
-        query_display = "\n\n".join(query_sections)
-        
-        if query_bill == self.query_bill:
-            result_docs = self.result_docs
-        else:
-            result_docs = self.ec.similar_doc_query(" ".join(query_sections),num_results = 100,
-                    return_fields = ["state","bill_document_last"])
-            self.query_bill = query_bill
-            self.result_docs = result_docs
-        
-        query_results = [[x['id'],x['score'],i] for i,x in enumerate(result_docs)]
-        
-        alignment_index = int(alignment_index)
-        align_bill = result_docs[alignment_index]['id']
-
-        alignment_doc = result_docs[alignment_index]
-        res_sequence = clean_document(alignment_doc['bill_document_last'],state_id = alignment_doc['state'])
-        align_display = res_sequence
-
-        res_sequence = alignment_tokenizer(res_sequence)
-        left_doc = [alignment_tokenizer(s) for s in query_sections]
-        alignments,indices = self.aligner.align_by_section(left_doc,res_sequence)
-        display_results = []
-        
-        for s,l,r in alignments:
-            
-            l,r = markup_alignment_difference(l,r)
-            l = " ".join(l)
-            r = " ".join(r)
-            display_results.append([l,r,s])
-        
-        indices = [str(x) for x in range(100)]
-        tmpl = env.get_template('evaluation.html')
-        c = {
-                'query_bill':query_bill,
-                'display_results': display_results,
-                'query_samples': query_samples,
-                'search_results': query_results,
-                'indices':indices,
-                'alignment_index':alignment_index,
-                'align_bill': align_bill,
-                'query_display':query_display,
-                'align_display':align_display
-        }
-        return tmpl.render(**c)
-
-    
     @cherrypy.expose
     def searchdemo(self,  query_string = "proof of identity",query_results = []):
         
@@ -263,32 +181,6 @@ class DemoWebserver(object):
     
 
 
-    @cherrypy.expose
-    def alignmentdemo(self, evaluation_data = None,left_doc_id = None,right_doc_id = None ):
-                
-        if left_doc_id != None and right_doc_id != None:   
-            doc_left = EVALUATION_DATA[int(left_doc_id)][1]
-            doc_right = EVALUATION_DATA[int(right_doc_id)][1]
-            doc_left,doc_right = get_alignment_highlight(doc_left,doc_right)
-            
-            
-            tmpl = env.get_template('alignmentdemo.html')
-            c = {
-                    
-                    'evaluation_data': EVALUATION_DATA,
-                    'doc_left': doc_left,
-                    'doc_right': doc_right,
-
-            }
-            return tmpl.render(**c)
-        else:
-            tmpl = env.get_template('alignmentdemo.html')
-            c = {
-                    
-                    'evaluation_data': EVALUATION_DATA,
-
-            }
-            return tmpl.render(**c)
 
             
         
@@ -298,6 +190,16 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=29010)
     parser.add_argument('--elasticsearch_connection',default= "localhost:9200")
     args = parser.parse_args()
+
+    env = Environment(loader=FileSystemLoader("{0}/html/templates".format(os.environ['POLICY_DIFFUSION'])))
+
+    query_samples = [x.strip() for x in open("{0}/data/state_bill_samples.txt".format(os.environ['POLICY_DIFFUSION']))]
+
+    aligner = AffineLocalAligner(match_score=4, mismatch_score=-1, gap_start=-3, gap_extend = -1.5)
+
+    ec = ElasticConnection(host = "54.203.12.145")
+
+    lidy = LID(query_results_limit=20,elastic_host = "54.203.12.145",lucene_score_threshold = 0.01,aligner = aligner)
     
     es_host,es_port = args.elasticsearch_connection.split(":") 
     cherrypy.config.update({'server.socket_port': args.port, 'server.socket_host': args.host})

@@ -180,44 +180,8 @@ class ElasticConnection():
         
         return doc_ids
 
-    def query_state_bills_for_frontend(self,query):
-        
-        json_query = """ 
-            {
-                "query": {
-                    "more_like_this": {
-                        "fields": [
-                            "bill_document_last.shingles"
-                        ],
-                        "like_text": "",
-                        "max_query_terms": 25,
-                        "min_term_freq": 1,
-                        "min_doc_freq": 2,
-                        "minimum_should_match": 1
-                    }
-                }
-            }
-        """
-        json_query = json.loads(json_query)
-        json_query['query']['more_like_this']['like_text'] = query            
-        results = self.es_connection.search(index = STATE_BILL_INDEX,body = json_query,
-                fields = ["state","bill_title","bill_id","bill_document_last"],
-                size = 100 )
-        results = results['hits']['hits']
-        result_docs = []
-        for res in results:
-            doc = {}
-            doc['text'] = res['fields']['bill_document_last'][0]
-            doc['title'] = res['fields']['bill_title'][0]
-            doc['bill_name'] = res['fields']['bill_id'][0]
-            doc['state'] = res["fields"]['state'][0]
-            doc['score'] = res['_score']
-            doc['id'] = res['_id']
-            result_docs.append(doc)
-        return result_docs
-
     
-
+    
     def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"], 
                             index = STATE_BILL_INDEX):
         json_query = """ 
@@ -269,32 +233,6 @@ class ElasticConnection():
         belongs to (e.g., all the stand your ground bills)
         '''
 
-        # json_query = """ 
-        #         {
-        #           "query": {
-        #             "filtered": {
-        #               "query": {
-        #                 "more_like_this": {
-        #                   "fields": [
-        #                     "bill_document_last.shingles"
-        #                   ],
-        #                   "like_text": "",
-        #                   "max_query_terms": 70,
-        #                   "min_term_freq": 1,
-        #                   "min_doc_freq": 2,
-        #                   "minimum_should_match": 1
-        #                 }
-        #               },
-        #               "filter": {
-        #                 "term": {
-        #                   "bill_document.match": ""
-        #                 }
-        #               }
-        #             }
-        #           }
-        #         }
-        # """
-
         json_query = """ 
             {
               "query": {
@@ -326,7 +264,6 @@ class ElasticConnection():
         """
         json_query = json.loads(json_query)
         json_query['query']['filtered']['query']['more_like_this']['like_text'] = query
-        # json_query['query']['filtered']['filter']['term']['bill_document.match'] = match_group
         json_query['query']['filtered']['filter']['bool']['must_not']['term']['bill_document.state'] = str(state_id)
 
 
@@ -339,7 +276,6 @@ class ElasticConnection():
             doc = {}
             for f in res['fields']:
                 doc[f] = res['fields'][f][0]
-            #doc['state'] = res["fields"]['state'][0]
             doc['score'] = res['_score']
             doc['id'] = res['_id']
             

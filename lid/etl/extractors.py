@@ -163,7 +163,7 @@ if __name__ == "__main__":
 ##extracts text from model legislation
 def extract_model_legislation(json_file, encoded):
     '''
-    variables: 
+    Keyword Args: 
     json_file: corresponds to json file with model legislation
     encoded: True/False if json file is b64 encoded
 
