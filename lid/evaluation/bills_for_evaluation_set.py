@@ -127,7 +127,7 @@ def grab_more_eval_bills():
 
 def create_save_bills(bill_list):
     bills = create_bills(bill_list)
-    with open('../../data/bills.p', 'wb') as fp:
+    with open('../../data/evaluation_set/labeled_bills.p', 'wb') as fp:
         pickle.dump(bills, fp)
 
     return bills
