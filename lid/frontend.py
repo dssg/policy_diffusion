@@ -53,8 +53,6 @@ def markup_alignment_for_display(alignment_dict,left_text,right_text):
     right_end = alignment_dict['right_end']
 
 
-    print left_text
-    print right_text
 
     #mark up l and r alignments with style
     l_styled = []
@@ -171,7 +169,6 @@ class DemoWebserver(object):
         
         
         results_to_show.sort(key = lambda x:x[0],reverse = True)
-        print [len(x) for x in results_to_show]
         tmpl = env.get_template('searchdemo.html')
         c = {
                 'query_string': query_string,
@@ -197,9 +194,9 @@ if __name__ == '__main__':
 
     aligner = AffineLocalAligner(match_score=4, mismatch_score=-1, gap_start=-3, gap_extend = -1.5)
 
-    ec = ElasticConnection(host = "54.203.12.145")
+    ec = ElasticConnection(host = "52.13.123.20")
 
-    lidy = LID(query_results_limit=20,elastic_host = "54.203.12.145",lucene_score_threshold = 0.01,aligner = aligner)
+    lidy = LID(query_results_limit=20,elastic_host = "52.13.123.20",lucene_score_threshold = 0.01,aligner = aligner)
     
     es_host,es_port = args.elasticsearch_connection.split(":") 
     cherrypy.config.update({'server.socket_port': args.port, 'server.socket_host': args.host})
