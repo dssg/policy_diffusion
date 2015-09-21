@@ -16,7 +16,7 @@ import time
 
 
 
-@deadline(600)
+@deadline(1000)
 def get_alignments(model_doc):
     result_docs = lidy.find_state_bill_alignments(model_doc['source'],document_type = "model_legislation",
             split_sections = True,query_document_id = model_doc['id'])
