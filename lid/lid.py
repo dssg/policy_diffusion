@@ -97,6 +97,8 @@ class LID(object):
         for i,result_doc in enumerate(result_docs):
             #print i,result_doc['score'],result_doc['state']
             
+            #excludes documents that are from same state
+            #future release will have all of these filters be options
             if "state_id" in kwargs:
                 if result_doc['state'] == kwargs['state_id']:
                     continue
