@@ -6,6 +6,24 @@ if [ ! -n "$POLICY_DIFFUSION" ]; then
     return
 fi
 
+# ensure user specified directory for log files
+if [ ! -n "$LOGFILE_DIRECTORY" ]; then
+    echo "Error: \$LOGFILE_DIRECTORY environment variable is not set"
+    return
+fi
+
+# ensure users specified a directory for temporary files
+if [ ! -n "$TEMPFILE_DIRECTORY" ]; then
+    echo "Error: \$TEMPFILE_DIRECTORY environment variable is not set"
+    return
+fi
+
+# ensure users specified the IP address for the ElasticSearch instance
+if [ ! -n "$ELASTICSEARCH_IP" ]; then
+    echo "Error: \$ELASTICSEARCH_IP environment variable is not set"
+    return
+fi
+
 # add python code to path
 export PYTHONPATH=${POLICY_DIFFUSION}/lid:${PYTHONPATH}
 export PYTHONPATH=${POLICY_DIFFUSION}/lid/etl:${PYTHONPATH}
