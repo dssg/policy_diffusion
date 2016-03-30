@@ -118,6 +118,67 @@ class LID(object):
         return alignment_docs
 
 
+
+
+    def find_model_legislation_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
+        '''
+        query_document: query document, usually in the form of an entire bill, model legislation or segment of either
+        
+        document_type: specifies the document type, default: "text" means that know section chunking will be done
+                        on the query, other options include state bill tuples i.e ("state_bill","al")
+                        and "model_legislation"
+
+        split_sections: specifies whether the query document will be broken into sections to find multiple alignments
+                        (True) or whether to treat the documents as one and identify a single best alignment (False)
+                            
+        '''
+
+        if document_type == "text":
+            kwargs['query_document_id'] = None
+        
+        
+        query_document = clean_document(query_document,doc_type = document_type,
+                    split_to_section = split_sections, **kwargs)
+        
+        elastic_query = u" ".join(query_document)
+
+        #query elastic search
+        result_docs = self.elastic_connection.similar_doc_query(elastic_query,num_results = self.results_limit,
+                return_fields = ["id","source"], index="model_legislation", 
+                fields="source")
+
+        align_doc = [alignment_tokenizer(s) for s in query_document]
+        
+        alignment_docs = {}
+        alignment_docs['query_document'] = query_document
+        alignment_docs['query_document_id'] = kwargs['query_document_id']
+        alignment_docs['alignment_results'] = []
+
+        num_states = 0
+        for i,result_doc in enumerate(result_docs):
+            #print i,result_doc['score'],result_doc['state']
+            
+            if "state_id" in kwargs:
+                if result_doc['state'] == kwargs['state_id']:
+                    continue
+
+            if result_doc['score'] < self.lucene_score_threshold:
+                break
+            
+            result_sequence = clean_document(result_doc['source'],state_id = result_doc['id'])[0]
+            result_sequence = alignment_tokenizer(result_sequence)
+            
+            alignment_obj = self.aligner.align(align_doc,[result_sequence])
+            
+            alignment_doc = {}
+            alignment_doc['alignments'] = [x for x in alignment_obj]
+            alignment_doc['lucene_score'] = result_doc['score']
+            alignment_doc['document_id'] = result_doc['id']
+            alignment_docs['alignment_results'].append(alignment_doc)
+        
+        return alignment_docs
+
+
     def find_evaluation_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
         '''
         query_document: query document, usually in the form of an entire bill, model legistlation or segment of either

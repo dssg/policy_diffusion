@@ -17,7 +17,7 @@ import elasticsearch
 
 #Constants
 STATE_BILL_INDEX = "state_bills"
-MODEL_LEGISLATION_INDEX = "model_legistlation"
+MODEL_LEGISLATION_INDEX = "model_legislation"
 EVALUATION_INDEX = "evaluation_texts"
 EVALUATION_INDEX_ALL_BILLS = "evaluation_bills_all_bills"
 
@@ -181,15 +181,14 @@ class ElasticConnection():
         return doc_ids
 
     
-    
     def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"], 
-                            index = STATE_BILL_INDEX):
+                            index = STATE_BILL_INDEX, fields = "bill_document_last.shingles"):
         json_query = """ 
             {
                 "query": {
                     "more_like_this": {
                         "fields": [
-                            "bill_document_last.shingles"
+                            "%s"
                         ],
                         "like_text": "",
                         "max_query_terms": 25,
@@ -199,13 +198,13 @@ class ElasticConnection():
                     }
                 }
             }
-        """
+        """ % (fields)
         json_query = json.loads(json_query)
         json_query['query']['more_like_this']['like_text'] = query
 
 
         results = self.es_connection.search(index = index,body = json_query,
-                fields = return_fields,
+                fields = fields,
                 size = num_results )
         results = results['hits']['hits']
         result_docs = []
@@ -213,18 +212,23 @@ class ElasticConnection():
             doc = {}
             for f in res['fields']:
                 doc[f] = res['fields'][f][0]
-            #doc['state'] = res["fields"]['state'][0]
+            #doc['state'] = res['fields']['state'][0]
             doc['score'] = res['_score']
             doc['id'] = res['_id']
-            
+
+
             #if applicable, only return docs that are from different states
-            if doc['state'] != state_id:
+            if return_fields == ['state']:
+                if doc['state'] != state_id:
+                    result_docs.append(doc)
+            else:
                 result_docs.append(doc)
         
         return result_docs
 
-    def similar_doc_query_for_testing_lucene(self,query, match_group, state_id = None,num_results = 100,return_fields = ["state"], 
-                            index = STATE_BILL_INDEX):
+    def similar_doc_query_for_testing_lucene(self,query, match_group, state_id = None,
+        num_results = 100,return_fields = ["state"],
+        index = STATE_BILL_INDEX):
         '''
         description:
             only for testing lucene scores
