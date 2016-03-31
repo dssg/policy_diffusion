@@ -67,7 +67,7 @@ class LID(object):
                 raise LidException(
                         "if document type is state_bill then you musy specify state_id and query_document_id")
 
-        elif document_type == "model_legistlation":
+        elif document_type == "model_legislation":
             try:
                 kwargs['query_document_id'] 
             except KeyError:

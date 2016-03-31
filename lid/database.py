@@ -182,7 +182,7 @@ class ElasticConnection():
 
     
     def similar_doc_query(self,query,state_id = None,num_results = 100,return_fields = ["state"], 
-                            index = STATE_BILL_INDEX, fields = "bill_document_last.shingles"):
+                            index = STATE_BILL_INDEX, fields = "bill_document_last"):
         json_query = """ 
             {
                 "query": {
@@ -215,6 +215,7 @@ class ElasticConnection():
             #doc['state'] = res['fields']['state'][0]
             doc['score'] = res['_score']
             doc['id'] = res['_id']
+            doc['state'] = doc['id'][0:2]
 
 
             #if applicable, only return docs that are from different states
@@ -244,7 +245,7 @@ class ElasticConnection():
                   "query": {
                     "more_like_this": {
                       "fields": [
-                        "bill_document_last.shingles"
+                        "bill_document_last"
                       ],
                       "like_text": "",
                       "max_query_terms": 70,
