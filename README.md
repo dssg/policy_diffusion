@@ -10,7 +10,7 @@ We use the Smith-Waterman local-alignment algorithm to find matching text across
 
 # How to use it?
 
-* The text_alignmnet.py file gives our implemtnation of the smith-waterman algorithm.
+* The text_alignmnet.py file gives our implemtnation of the smith-waterman algorithm. Feel free to use it!
 
 # Important Files
 
