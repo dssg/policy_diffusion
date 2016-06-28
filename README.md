@@ -8,6 +8,10 @@ This project provides tools to help analyze and access government bills. Using t
 
 We use the Smith-Waterman local-alignment algorithm to find matching text across documents. This algorithm grabs pieces of text from each document and compares each word, adding points for matches and subtracting points for mismatches. Unfortunately, the local-alignment algorithm is too slow for large sets of text, such as ours. It could take the algorithm thousands of years to finish analyzing the legislation. We improved the speed of the analysis by first limiting the number of documents that need to be compared. Elasticsearch, our database of choice for this project, efficiently calculates Lucene scores. When we use LID to search for a document, it quickly compares our document against all others and grabs the 100 most similar documents as measured by their Lucene scores. Then we run the local-alignment algorithm on those 100.
 
+# How to use it?
+
+* The text_alignmnet.py file gives our implemtnation of the smith-waterman algorithm.
+
 # Important Files
 
 * text_alignment.py: contains our fast implementation of the smith-waterman algorithm.
