@@ -416,7 +416,7 @@ def main():
     args = parser.parse_args()
     if args.command == "compute_bill_similarity_matrix":
         #handle error logger
-        logging.basicConfig(filename="{0}/logs/bill_similarity_matrix.log".format(os.environ['POLICY_DIFFUSION']),
+        logging.basicConfig(filename="{0}".format(os.environ['LOGFILE_DIRECTORY']),
                 level=logging.DEBUG)
         logging.getLogger('elasticsearch').setLevel(logging.ERROR)
         logging.getLogger('urllib3').setLevel(logging.ERROR)
