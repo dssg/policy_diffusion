@@ -2,7 +2,6 @@ from __future__ import division
 
 
 '''main module for the LID (legislative influence detector) system '''
-from config import DATA_PATH
 from database import ElasticConnection
 from multiprocessing import Pool
 from text_alignment import LocalAligner
@@ -15,6 +14,15 @@ import os
 import re
 import time
 import traceback
+
+
+#configure logging options here
+
+logging.basicConfig(filename="{0}/lid.log".format(os.environ['LOGFILE_DIRECTORY']),
+                level=logging.DEBUG)
+logging.getLogger('elasticsearch').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.ERROR)
+
 
 '''custom exception object for LID class'''
 class LidException(Exception):
@@ -415,13 +423,8 @@ def main():
 
     args = parser.parse_args()
     if args.command == "compute_bill_similarity_matrix":
-        #handle error logger
-        logging.basicConfig(filename="{0}".format(os.environ['LOGFILE_DIRECTORY']),
-                level=logging.DEBUG)
-        logging.getLogger('elasticsearch').setLevel(logging.ERROR)
-        logging.getLogger('urllib3').setLevel(logging.ERROR)
         
-        out_file = open("{0}/bill_similarity_matrix.json".format(DATA_PATH),'w')
+        out_file = open("{0}/bill_similarity_matrix.json".format(data_path),'w')
         
         bill_ids = [x.strip() for x in open("{0}/data/bill_ids.txt".format(os.environ['POLICY_DIFFUSION']))]
 
