@@ -1,13 +1,12 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 import os
-import pdb
 import sys
 import argparse
 import datetime as dt
 import time
 from collections import defaultdict
 import cherrypy
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, FileSystemLoader
 import random
 import string
 import json
@@ -82,12 +81,16 @@ def markup_alignment_for_display(alignment_dict,left_text,right_text):
 
     #l[i] = "<mark>{0}</mark>".format(l[i])
     #r[i] = "<mark>{0}</mark>".format(r[i])
-    
+
+        
     #l.insert(0,"<mark>")
     #l.append("</mark>")
     #r.insert(0,"<mark>")
     #r.append("</mark>")
+
     
+
+
     padding = [u"<br><br>"]
 
     left_text = left_text[:left_start]+padding+l_styled+\
@@ -117,11 +120,12 @@ def markup_alignment_difference(l,r):
 
 
 class DemoWebserver(object):
+   
 
     _cp_config = {
        'tools.staticdir.on' : True,
        'tools.staticdir.dir' : "{0}/html".format(os.environ['POLICY_DIFFUSION']),
-       'tools.staticdir.index' : '/templates/searchdemo.html.jinja',
+       'tools.staticdir.index' : '/templates/searchdemo.html',
        'tools.sessions.on': True,
     }
     
@@ -129,17 +133,14 @@ class DemoWebserver(object):
 
     def __init__(self,elastic_connection):
         self.ec = elastic_connection
-        self.lidy = LID(elastic_host = os.environ['ELASTICSEARCH_IP'],
-                query_results_limit=os.environ['QUERY_RESULTS_LIMIT'])
-        
+        self.lidy = LID(elastic_host = "54.203.12.145",query_results_limit=100)
         self.aligner = LocalAligner()
         self.query_bill = "bill"
 
-
     @cherrypy.expose
-    def searchdemo(self, query_string="proof of identity", query_results=[]):
+    def searchdemo(self,  query_string = "proof of identity",query_results = []):
         
-        query_string = re.sub('\"',' ',query_string)
+        query_string =  re.sub('\"',' ',query_string)
         
         query_result = lidy.find_state_bill_alignments(query_string,document_type = "text",
             split_sections = False, query_document_id = "front_end_query" )
@@ -149,7 +150,6 @@ class DemoWebserver(object):
         #result_doc_ids = [[x[0].upper(),x[1].upper(),x[2]] for x in result_doc_ids]
 
         results_to_show = []
-
         for result_doc in query_result['alignment_results']:
             
             meta_data = result_doc['document_id'].split("_")
@@ -165,39 +165,39 @@ class DemoWebserver(object):
                     query_string,result_text)
             left = re.sub('\"',' ',left)
             right = re.sub('\"',' ',right)
-            results_to_show.append([score] + meta_data + [left,right])
-
+            results_to_show.append([score]+meta_data + [left,right])
+        
+        
         results_to_show.sort(key = lambda x:x[0],reverse = True)
-
-        #tmpl = env.get_template("{0}/html/templates/searchdemo.html.jinja".format(os.environ['POLICY_DIFFUSION']))   #('searchdemo.html')
-        tmpl = env.get_template("searchdemo.html.jinja") 
+        tmpl = env.get_template('searchdemo.html')
         c = {
                 'query_string': query_string,
                 'results_to_show': results_to_show,
         }
         return tmpl.render(**c)
+    
 
 
+
+            
+        
 if __name__ == '__main__':
-    policy_diffusion_path=os.environ['POLICY_DIFFUSION']
-    ec_ip = os.environ['ELASTICSEARCH_IP']
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', type=str, default='0.0.0.0')
     parser.add_argument('--port', type=int, default=29010)
-    parser.add_argument('--elasticsearch_connection',default=u"{0}:9200".format(ec_ip))
+    parser.add_argument('--elasticsearch_connection',default= "localhost:9200")
     args = parser.parse_args()
 
-    env = Environment(loader=FileSystemLoader("{0}/html/templates".format(policy_diffusion_path)))
+    env = Environment(loader=FileSystemLoader("{0}/html/templates".format(os.environ['POLICY_DIFFUSION'])))
+
+    query_samples = [x.strip() for x in open("{0}/data/state_bill_samples.txt".format(os.environ['POLICY_DIFFUSION']))]
+
+    aligner = AffineLocalAligner(match_score=4, mismatch_score=-1, gap_start=-3, gap_extend = -1.5)
+
+    ec = ElasticConnection(host = "52.13.123.20")
+
+    lidy = LID(query_results_limit=20,elastic_host = "52.13.123.20",lucene_score_threshold = 0.01,aligner = aligner)
     
-    query_samples = [x.strip() for x in open("{0}/data/state_bill_samples.txt".format(policy_diffusion_path))]
-
-    aligner = AffineLocalAligner(match_score=4, mismatch_score=-1, gap_start=-3, gap_extend=-1.5)
-
-    ec = ElasticConnection(host = ec_ip)
-
-    lidy = LID(query_results_limit=20, elastic_host=ec_ip,
-            lucene_score_threshold=0.01, aligner=aligner)
-
     es_host,es_port = args.elasticsearch_connection.split(":") 
     cherrypy.config.update({'server.socket_port': args.port, 'server.socket_host': args.host})
-    cherrypy.quickstart(DemoWebserver(ec), "/")
+    cherrypy.quickstart(DemoWebserver(ec))
