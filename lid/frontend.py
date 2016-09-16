@@ -169,7 +169,6 @@ class DemoWebserver(object):
 
         results_to_show.sort(key = lambda x:x[0],reverse = True)
 
-        #tmpl = env.get_template("{0}/html/templates/searchdemo.html.jinja".format(os.environ['POLICY_DIFFUSION']))   #('searchdemo.html')
         tmpl = env.get_template("searchdemo.html.jinja") 
         c = {
                 'query_string': query_string,
