@@ -133,48 +133,80 @@ class DemoWebserver(object):
                 query_results_limit=os.environ['QUERY_RESULTS_LIMIT'])
         
         self.aligner = LocalAligner()
-        self.query_bill = "bill"
+        #self.query_bill = "bill"
 
 
     @cherrypy.expose
-    def searchdemo(self, query_string="proof of identity", query_results=[]):
+    def searchdemo(self, query_string="proof of identity", query_bill = "bill", query_results=[]):
         
         query_string = re.sub('\"',' ',query_string)
+
+        if query_bill == "model legislation":
+
+            query_result = lidy.find_model_legislation_alignments(query_string, document_type="text",
+                    split_sections=False, query_document_id="front_end_query")
+
+            results_to_show = []
+
+            for result_doc in query_result['alignment_results']:
+
+                meta_data = result_doc['document_id'].replace('old_bills', 'oldbills').split('_')
+                meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
+
+                result_text = ec.get_model_legislation_by_id(result_doc['document_id'])['source']
+                result_text = re.sub('\"',' ',result_text)
+
+                alignment = result_doc['alignments'][0]
+                score = alignment['score']
+
+                left,right = markup_alignment_for_display(alignment,
+                        query_string, result_text)
+                left = re.sub('\"',' ',left)
+                right = re.sub('\"',' ',right)
+                results_to_show.append([score] + meta_data + [left,right])
+
+            results_to_show.sort(key = lambda x:x[0],reverse = True)
+
+            tmpl = env.get_template("searchdemo.html.jinja")
+            c = {
+                    'query_string': query_string,
+                    'results_to_show': results_to_show,
+            }
+            return tmpl.render(**c)
         
-        query_result = lidy.find_state_bill_alignments(query_string,document_type = "text",
-            split_sections = False, query_document_id = "front_end_query" )
+        #if query_bill == "bill":
+        else:
+            query_result = lidy.find_state_bill_alignments(query_string, document_type="text",
+                split_sections=False, query_document_id="front_end_query")
 
-        #result_doc_ids = [x['document_id'] for x in query_result['alignment_results']]
-        #result_doc_ids = [x.split("_") for x in result_doc_ids]
-        #result_doc_ids = [[x[0].upper(),x[1].upper(),x[2]] for x in result_doc_ids]
+            results_to_show = []
 
-        results_to_show = []
-
-        for result_doc in query_result['alignment_results']:
+            for result_doc in query_result['alignment_results']:
             
-            meta_data = result_doc['document_id'].split("_")
-            meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
+                meta_data = result_doc['document_id'].split("_")
+                meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
             
-            result_text = ec.get_bill_by_id(result_doc['document_id'])['bill_document_last']
-            result_text = re.sub('\"',' ',result_text)
+                result_text = ec.get_bill_by_id(result_doc['document_id'])['bill_document_last']
+                result_text = re.sub('\"',' ',result_text)
             
-            alignment = result_doc['alignments'][0]
-            score = alignment['score']
+                alignment = result_doc['alignments'][0]
+                score = alignment['score']
 
-            left,right = markup_alignment_for_display(alignment,
-                    query_string,result_text)
-            left = re.sub('\"',' ',left)
-            right = re.sub('\"',' ',right)
-            results_to_show.append([score] + meta_data + [left,right])
+                left,right = markup_alignment_for_display(alignment,
+                        query_string,result_text)
+                left = re.sub('\"',' ',left)
+                right = re.sub('\"',' ',right)
+                results_to_show.append([score] + meta_data + [left,right])
 
-        results_to_show.sort(key = lambda x:x[0],reverse = True)
+            results_to_show.sort(key = lambda x:x[0],reverse = True)
 
-        tmpl = env.get_template("searchdemo.html.jinja") 
-        c = {
-                'query_string': query_string,
-                'results_to_show': results_to_show,
-        }
-        return tmpl.render(**c)
+            tmpl = env.get_template("searchdemo.html.jinja") 
+            c = {
+                    'query_string': query_string,
+                    'results_to_show': results_to_show,
+            }
+            return tmpl.render(**c)
+
 
 
 if __name__ == '__main__':
