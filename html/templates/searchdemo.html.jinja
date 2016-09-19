@@ -88,13 +88,17 @@ document.getElementById("right_text").innerHTML=rightText;
     <p><a href="http://dssg.uchicago.edu/lid">http://dssg.uchicago.edu</a></p>
   </div>
 
+<br>
 
-   <p>Copy and paste the text of the legislative bill or model legislation you'd like to find matches for</p>
+   <h3>Step 1: Choose the type of document you'd like to search</h3>
    <form method="get" action="searchdemo">
-       <!--<input type="text" value="type query here" name="query_string" size=600 /> -->
+         <input type="radio" name="query_bill" value="bill" checked> Search state bills<br>
+         <input type="radio" name="query_bill" value="model legislation"> Search model legislation<br>
+    <br>
+   <h3>Step 2: Copy and paste the text of the legislative bill or model legislation you'd like to find matches for</h3>
        <textarea name="query_string" class="form-control" rows="5"> </textarea>
         <br>
-        <br>
+   <h3>Step 3: Press the submit button</h3>
         <button type="submit" class="btn btn-info btn-sm">search</button>
     </form>
 
@@ -106,13 +110,12 @@ document.getElementById("right_text").innerHTML=rightText;
 
 
 
-    <h2>Matching Documents</h2>
-    <p>Scroll potential matches and click on the ones you'd like to investigate. Green indicates likely matches. Red indicates likely not.</p>
+    <h3>Step 4: Scroll potential matches and click on the ones you'd like to investigate. Green indicates likely matches. Red indicates likely not.</h3>
     <div class="row">
 
             <div class="span3">
             <table>
-            <tr><td><b>State</b></td><td><b>Session</b></td><td><b>Bill Number</b></td></tr>
+            <tr><td><b>State/Org</b></td><td><b>Session/Type</b></td><td><b>Number</b></td></tr>
                         {% for row in results_to_show %}
             <tr><td>{{ row.1 }}</td>
                 <td>{{ row.2 }}</td>

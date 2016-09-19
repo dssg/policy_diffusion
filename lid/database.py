@@ -295,6 +295,10 @@ class ElasticConnection():
         match = self.es_connection.get_source(index = index,id = id)
         return match
 
+    def get_model_legislation_by_id(self, id, index=MODEL_LEGISLATION_INDEX):
+        match = self.es_connection.get_source(index=index, id=id)
+        return match
+
         
     def get_all_bills(self, step = 3000):
         es = self.es_connection

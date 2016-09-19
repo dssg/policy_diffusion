@@ -54,7 +54,7 @@ class LID(object):
         
     
 
-    def find_state_bill_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
+    def find_state_bill_alignments(self, query_document, document_type="text", split_sections=False, **kwargs):
         '''
         query_document: query document, usually in the form of an entire bill, model legistlation or segment of either
         
@@ -79,7 +79,7 @@ class LID(object):
             try:
                 kwargs['query_document_id'] 
             except KeyError:
-                raise LidException("if document type is model_legistlation then you musy specify query_document_id")
+                raise LidException("if document type is model_legislation then you musy specify query_document_id")
         
         elif document_type == "text":
             kwargs['query_document_id'] = None
@@ -128,7 +128,7 @@ class LID(object):
 
 
 
-    def find_model_legislation_alignments(self,query_document,document_type = "text",split_sections = False,**kwargs):
+    def find_model_legislation_alignments(self, query_document, document_type="text", split_sections=False, **kwargs):
         '''
         query_document: query document, usually in the form of an entire bill, model legislation or segment of either
         
@@ -138,7 +138,6 @@ class LID(object):
 
         split_sections: specifies whether the query document will be broken into sections to find multiple alignments
                         (True) or whether to treat the documents as one and identify a single best alignment (False)
-                            
         '''
 
         if document_type == "text":
