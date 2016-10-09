@@ -177,17 +177,17 @@ class DemoWebserver(object):
 
         if query_bill == "constitution":
 
-            query_result = constitution_lidy.get_constitution_alignments(query_string, document_type="text",
+            query_result = constitution_lidy.find_constitution_alignments(query_string, document_type="text",
                     split_sections=True, query_document_id="text")
 
             results_to_show = []
 
             for result_doc in query_result['alignment_results']:
 
-                meta_data = result_doc['document_id'].replace('old_bills', 'oldbills').split('_')
+                meta_data = result_doc['document_id'].split('_')
                 meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
 
-                result_text = ec.get_model_legislation_by_id(result_doc['document_id'])['source']
+                result_text = ec.get_constitution_by_id(result_doc['document_id'])['constitution']
                 result_text = re.sub('\"',' ',result_text)
 
                 alignment = result_doc['alignments'][0]
