@@ -27,11 +27,14 @@ def clean_text(text, lower = True):
     #make text lowercase
     if lower == True:
         text = text.lower()
-    
+   
+    text = re.sub('\n[ ]*[0-9]+', '', text)
+    text = re.sub('[ ]{2,}', u' ', text) 
+
     #parse by line
     text_list =  text.splitlines()
 
-    #replace funky symbols and multipe new lines
+    #replace funky symbols and multiple new lines
     ntext_list = []
     for line in text_list:
         line = line.replace(u'\xa0', u' ')
@@ -42,8 +45,9 @@ def clean_text(text, lower = True):
         line = line.replace(u'\u201d', u' ')
         line = line.replace(u'\xbb', u' ')
         line = line.replace(u'\xa9', u' ')
+        line = line.replace(u' ,', u',')
         line = line.replace(u'{ font-family: courier, arial, sans-serif; font-size: 10pt; } table { empty-cells:show; }', u' ')
-        line = re.sub( '\s+', ' ', line)
+        line = re.sub( '\s+', u' ', line)
         ntext_list.append(line)
     return (string.join(ntext_list, '\n'))
  

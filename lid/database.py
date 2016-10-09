@@ -20,6 +20,7 @@ STATE_BILL_INDEX = "state_bills"
 MODEL_LEGISLATION_INDEX = "model_legislation"
 EVALUATION_INDEX = "evaluation_texts"
 EVALUATION_INDEX_ALL_BILLS = "evaluation_bills_all_bills"
+CONSTITUTIONS_INDEX = "constitutions"
 
 
 class ElasticConnection():
@@ -299,6 +300,9 @@ class ElasticConnection():
         match = self.es_connection.get_source(index=index, id=id)
         return match
 
+    def get_constitution_by_id(self, id, index=CONSTITUTIONS_INDEX):
+        match = self.es_connection.get_source(index=index, id=id)
+        return match
         
     def get_all_bills(self, step = 3000):
         es = self.es_connection
