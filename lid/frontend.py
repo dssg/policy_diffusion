@@ -174,7 +174,41 @@ class DemoWebserver(object):
             }
             return tmpl.render(**c)
         
-        #if query_bill == "bill":
+
+        if query_bill == "constitution":
+
+            query_result = constitution_lidy.get_constitution_alignments(query_string, document_type="text",
+                    split_sections=True, query_document_id="text")
+
+            results_to_show = []
+
+            for result_doc in query_result['alignment_results']:
+
+                meta_data = result_doc['document_id'].replace('old_bills', 'oldbills').split('_')
+                meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
+
+                result_text = ec.get_model_legislation_by_id(result_doc['document_id'])['source']
+                result_text = re.sub('\"',' ',result_text)
+
+                alignment = result_doc['alignments'][0]
+                score = alignment['score']
+
+                left,right = markup_alignment_for_display(alignment,
+                        query_string, result_text)
+                left = re.sub('\"',' ',left)
+                right = re.sub('\"',' ',right)
+                results_to_show.append([score] + meta_data + [left,right])
+
+            results_to_show.sort(key = lambda x:x[0],reverse = True)
+
+            tmpl = env.get_template("searchdemo.html.jinja")
+            c = {
+                    'query_string': query_string,
+                    'results_to_show': results_to_show,
+            }
+            return tmpl.render(**c)
+        
+
         else:
             query_result = lidy.find_state_bill_alignments(query_string, document_type="text",
                 split_sections=False, query_document_id="front_end_query")
@@ -228,6 +262,11 @@ if __name__ == '__main__':
 
     lidy = LID(query_results_limit=20, elastic_host=ec_ip,
             lucene_score_threshold=0.01, aligner=aligner)
+
+    constitution_lidy = LID(query_results_limit=10000,
+            elastic_host=ip_addy, lucene_score_threshold=0, 
+            aligner=aligner)
+
 
     es_host,es_port = args.elasticsearch_connection.split(":") 
     cherrypy.config.update({'server.socket_port': args.port, 'server.socket_host': args.host})
