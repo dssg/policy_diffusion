@@ -184,11 +184,13 @@ class DemoWebserver(object):
 
             for result_doc in query_result['alignment_results']:
 
-                meta_data = result_doc['document_id'].split('_')
-                meta_data = [meta_data[0].upper(),meta_data[1].upper(),meta_data[2]]
+                state = result_doc['document_id'][:-5].upper()
+		year = result_doc['document_id'][-4:]
+                meta_data = ["CONSTITUTION", state, year]
 
                 result_text = ec.get_constitution_by_id(result_doc['document_id'])['constitution']
                 result_text = re.sub('\"',' ',result_text)
+		print result_text
 
                 alignment = result_doc['alignments'][0]
                 score = alignment['score']
@@ -264,7 +266,7 @@ if __name__ == '__main__':
             lucene_score_threshold=0.01, aligner=aligner)
 
     constitution_lidy = LID(query_results_limit=10000,
-            elastic_host=ip_addy, lucene_score_threshold=0, 
+            elastic_host=ec_ip, lucene_score_threshold=0.01, 
             aligner=aligner)
 
 
