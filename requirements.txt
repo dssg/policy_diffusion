@@ -1,0 +1,6 @@
+jinja2==2.8
+elasticsearch==2.4
+enum34==1.1.6
+cherrypy==3.8
+numba==4.2.9
+ujson==1.35
