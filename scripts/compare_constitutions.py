@@ -34,8 +34,8 @@ def main():
         print doc
         doc_text = es_connection.get_source(index = 'constitutions', id = doc)['constitution']
         result_doc = get_constitution_alignments(doc_text)
-        open('constitution_matches.json', 'a').write(json.dumps(result_doc))
-        time.sleep(10)
+        open('/mnt/data/jwalsh/constitution_matches.json', 'a').write(json.dumps(result_doc))
+        time.sleep(1)
 
 
 
@@ -49,7 +49,8 @@ if __name__ == "__main__":
     es_connection = Elasticsearch([{'host': ip_addy, 'port': 9200}])
 
     query_results_limit = os.environ['QUERY_RESULTS_LIMIT']
-    constitution_lidy = LID(query_results_limit=10000, elastic_host=ip_addy, lucene_score_threshold=0, aligner=aligner)
+    constitution_lidy = LID(query_results_limit=query_results_limit, elastic_host=ip_addy,
+	lucene_score_threshold=0.01, aligner=aligner)
 
     main()
 
